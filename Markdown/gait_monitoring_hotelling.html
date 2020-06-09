@@ -1702,7 +1702,7 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <h1><span class="header-section-number">3</span> Data Preprocessing and Rational Subgroups</h1>
 <div id="data-preprocessing" class="section level2">
 <h2><span class="header-section-number">3.1</span> Data Preprocessing</h2>
-<p>In Section 1, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the <code>videoDataList</code> since these corresponded to the warm-up period of the experiment as detailed in <span class="citation">Maman et al. (2017)</span>, <span class="citation">Baghdadi et al. (2019)</span>, and <span class="citation">Maman et al. (2020)</span>. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span></p>
+<p>In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the <code>videoDataList</code> since these corresponded to the warm-up period of the experiment as detailed in <span class="citation">Maman et al. (2017)</span>, <span class="citation">Baghdadi et al. (2019)</span>, and <span class="citation">Maman et al. (2020)</span>. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span></p>
 <pre class="r"><code>for (i in seq(length(rawSubjectsData))) {
   videoDataList[[i]] %&lt;&gt;%  
     na.omit() %&gt;% # removing NA observations
@@ -1721,6 +1721,7 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <li>Between group variability can be used to capture the effects of “assignable causes of variability”, which can include disease progression, fatigue, etc.</li>
 </ul>
 <p>For more details on rational subgrouping, we refer the reader to <span class="citation">Montgomery (2019)</span> for more details. The code chunk below provides our approach to creating the rational subgroups for both the “profile” and “gait features” data sets.</p>
+<pre class="r"><code>#</code></pre>
 <p><span style="color: blue;">——————I stopped here——————— </span></p>
 <hr />
 </div>
