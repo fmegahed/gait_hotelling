@@ -1636,13 +1636,15 @@ startTime = Sys.time()</code></pre>
 <div id="extracting-transforming-and-loading-etl-the-gait-data-into-r" class="section level1">
 <h1><span class="header-section-number">2</span> Extracting, Transforming and Loading (ETL) the Gait Data into R</h1>
 <p>In this paper, we perform a secondary data analysis of the experimental data reported in <span class="citation">Baghdadi et al. (2019)</span>, where fifteen participants were equipped with an IMU sensor wrapped on their right ankle. We used the IMU data to transform the linear acceleration signals from the local frame of reference to the global frame of reference. Next, we calculated the acceleration magnitude signal and smoothed it by applying a low pass butterworth filter with a cut-off frequency of 10 Hz. Further, we segmented the idividual gait cycles from foot-flat to foot-flat for each participant by tuning the parameters of the segmentation algorithm for each participant.</p>
-<p>We load three different sets of data into R:</p>
+<p>We load <strong>four different sets of data</strong> into R:</p>
 <ul>
-<li><em>Subject heights</em>, which is read directly from the <a href="https://github.com/fmegahed/fatigue-changepoint">GitHub Repository</a> of the <span class="citation">Baghdadi et al. (2019)</span> paper. Note that we have excluded Subject 13’s data due to <span style="color: blue;">we need to insert some reasons here</span>.<br />
+<li><em>Subject heights</em>, which is read directly from the <a href="https://github.com/fmegahed/fatigue-changepoint">GitHub Repository</a> of the <span class="citation">Baghdadi et al. (2019)</span> paper. Note that we have excluded Subject 13’s data due to <span style="color: blue;">———–we need to insert some reasons here—————</span>.<br />
 </li>
 <li><em>Features</em>, where we extract the <em>x</em> and <em>y</em> positions as well as <em>stride duration</em> and <em>experimental time</em>. The first three elements are used to compute stride length, height and duration which are three important kinematic features that can be used to model/monitor changes in gait. Note that we did not use this data directly from the <span class="citation">Baghdadi et al. (2019)</span> paper since our segmentation here was from foot-flat to foot-flat and a different frequency for the butterworth filter was used (given that the goals of our paper and the original paper are different).<br />
 </li>
-<li><em>Profiles</em>, where the points forming each gait segment are mantained. The profiles present an alternative approach to monitoring and modeling changes in the gait cycles.</li>
+<li><em>Profiles</em>, where the points forming each gait segment are mantained. The profiles present an alternative approach to monitoring and modeling changes in the gait cycles.<br />
+</li>
+<li><em>Video tags</em>, where have coded when subjects enter and leave the main laboratory room. This information is used to ensure the consistency of the task being performed by the participant, i.e., we do not want the detected changes to correspond to a task change, but rather to indicate fatigue (see the discussion in our manuscript for more details).</li>
 </ul>
 <p>The code chunk below provides our code for reading the three different datasets. The <em>subject heights</em> dataset is saved into a vector, which we use to scale the computed gait/stride length and height. The main outputs from this chunk are two lists (a) <strong>subjectFeaturesList</strong> which contains the <em>scaled stride length</em>, <em>scaled stride height</em>, <em>stride duration</em> and <em>experimental time</em>, and (b) <strong>subjectProfilesList</strong> which contains the sample IMU acceleration points making each acceleration profile.</p>
 <pre class="r"><code># Reading the subject Heights from the Baghdadi et al. (2019) GitHub Repo:
@@ -1696,8 +1698,22 @@ videoDataList = lapply(videoFiles, read.csv)
 names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:]*&quot;, simplify = TRUE)</code></pre>
 <hr />
 </div>
-<div id="data-preprocessing-rational-subgroups" class="section level1">
-<h1><span class="header-section-number">3</span> Data Preprocessing: Rational Subgroups</h1>
+<div id="data-preprocessing-and-rational-subgroups" class="section level1">
+<h1><span class="header-section-number">3</span> Data Preprocessing and Rational Subgroups</h1>
+<div id="data-preprocessing" class="section level2">
+<h2><span class="header-section-number">3.1</span> Data Preprocessing</h2>
+<p>In Section 1, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the <code>videoDataList</code> since these corresponded to the warm-up period of the experiment as detailed in <span class="citation">Maman et al. (2017)</span>, <span class="citation">Baghdadi et al. (2019)</span>, and <span class="citation">Maman et al. (2020)</span>. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span></p>
+<pre class="r"><code>for (i in seq(length(rawSubjectsData))) {
+  videoDataList[[i]] %&lt;&gt;%  
+    na.omit() %&gt;% # removing NA observations
+    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %&gt;% # subtracting 600 seconds for warm-up
+    filter(Enters &gt; 0 &amp; Leaves &gt; 0) # removing observations/tasks, which contained any of the warm-up period
+  
+  
+}</code></pre>
+</div>
+<div id="rational-subgroups" class="section level2">
+<h2><span class="header-section-number">3.2</span> Rational Subgroups</h2>
 <p>Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only “out-of-the-room” data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive “out-of-the-room” gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the <strong>rational subgrouping</strong> mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:</p>
 <ul>
 <li>Minimize the variability within a subgroup such that the witin-group variability captures the natural variability in the gait cycles.<br />
@@ -1705,14 +1721,21 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <li>Between group variability can be used to capture the effects of “assignable causes of variability”, which can include disease progression, fatigue, etc.</li>
 </ul>
 <p>For more details on rational subgrouping, we refer the reader to <span class="citation">Montgomery (2019)</span> for more details. The code chunk below provides our approach to creating the rational subgroups for both the “profile” and “gait features” data sets.</p>
-<p><span style="color: blue;">I stopped here </span></p>
+<p><span style="color: blue;">——————I stopped here——————— </span></p>
 <hr />
+</div>
 </div>
 <div id="references" class="section level1 unnumbered">
 <h1>References</h1>
 <div id="refs" class="references">
 <div id="ref-baghdadi2019monitoring">
 <p>Baghdadi, A., Cavuoto, L. A., Jones-Farmer, A., Rigdon, S. E., Esfahani, E. T., &amp; Megahed, F. M. (2019). Monitoring worker fatigue using wearable devices: A case study to detect changes in gait parameters. <em>Journal of Quality Technology</em>, <em>Online First</em>. <a href="https://doi.org/10.1080/00224065.2019.1640097">https://doi.org/10.1080/00224065.2019.1640097</a></p>
+</div>
+<div id="ref-maman2020data">
+<p>Maman, Z. S., Chen, Y.-J., Baghdadi, A., Lombardo, S., Cavuoto, L. A., &amp; Megahed, F. M. (2020). A data analytic framework for physical fatigue management using wearable sensors. <em>Expert Systems with Applications</em>, 113405.</p>
+</div>
+<div id="ref-maman2017data">
+<p>Maman, Z. S., Yazdi, M. A. A., Cavuoto, L. A., &amp; Megahed, F. M. (2017). A data-driven approach to modeling physical fatigue in the workplace using wearable sensors. <em>Applied Ergonomics</em>, <em>65</em>, 515–529.</p>
 </div>
 <div id="ref-montgomery2019introduction">
 <p>Montgomery, D. C. (2019). <em>Introduction to statistical quality control</em>. Wiley.</p>

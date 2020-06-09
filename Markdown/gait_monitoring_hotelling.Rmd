@@ -71,11 +71,12 @@ startTime = Sys.time()
 # Extracting, Transforming and Loading (ETL) the Gait Data into R
 In this paper, we perform a secondary data analysis of the experimental data reported in @baghdadi2019monitoring, where fifteen participants were equipped with an IMU sensor wrapped on their right ankle. We used the IMU data to transform the linear acceleration signals from the local frame of reference to the global frame of reference. Next, we calculated the acceleration magnitude signal and smoothed it by applying a low pass butterworth filter with a cut-off frequency of 10 Hz. Further, we segmented the idividual gait cycles from foot-flat to foot-flat for each participant by tuning the parameters of the segmentation algorithm for each participant.  
 
-We load three different sets of data into R:  
+We load **four different sets of data** into R:  
 
-  -  *Subject heights*, which is read directly from the [GitHub Repository](https://github.com/fmegahed/fatigue-changepoint) of the @baghdadi2019monitoring paper. Note that we have excluded Subject 13's data due to <span style="color: blue;">we need to insert some reasons here</span>.    
+  -  *Subject heights*, which is read directly from the [GitHub Repository](https://github.com/fmegahed/fatigue-changepoint) of the @baghdadi2019monitoring paper. Note that we have excluded Subject 13's data due to <span style="color: blue;">-----------we need to insert some reasons here---------------</span>.    
   - *Features*, where we extract the *x* and *y* positions as well as *stride duration* and *experimental time*. The first three elements are used to compute stride length, height and duration which are three important kinematic features that can be used to model/monitor changes in gait. Note that we did not use this data directly from the @baghdadi2019monitoring paper since our segmentation here was from foot-flat to foot-flat and a different frequency for the butterworth filter was used (given that the goals of our paper and the original paper are different).    
-  - *Profiles*, where the points forming each gait segment are mantained. The profiles present an alternative approach to monitoring and modeling changes in the gait cycles. 
+  - *Profiles*, where the points forming each gait segment are mantained. The profiles present an alternative approach to monitoring and modeling changes in the gait cycles.   
+  - *Video tags*, where have coded when subjects enter and leave the main laboratory room. This information is used to ensure the consistency of the task being performed by the participant, i.e., we do not want the detected changes to correspond to a task change, but rather to indicate fatigue (see the discussion in our manuscript for more details).
 
 The code chunk below provides our code for reading the three different datasets. The *subject heights* dataset is saved into a vector, which we use to scale the computed gait/stride length and height. The main outputs from this chunk are two lists (a) **subjectFeaturesList** which contains the *scaled stride length*, *scaled stride height*, *stride duration* and *experimental time*, and (b) **subjectProfilesList** which contains the sample IMU acceleration points making each acceleration profile.
 ```{r read}
@@ -132,7 +133,25 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, "Subject[:digit:]*", 
 
 ---
 
-# Data Preprocessing: Rational Subgroups
+# Data Preprocessing and Rational Subgroups
+
+
+## Data Preprocessing
+In Section 1, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
+
+```{r dataCleaning}
+for (i in seq(length(rawSubjectsData))) {
+  videoDataList[[i]] %<>%  
+    na.omit() %>% # removing NA observations
+    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+  
+  
+}
+
+```
+
+## Rational Subgroups
 Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:    
 
   - Minimize the variability within a subgroup such that the witin-group variability captures the natural variability in the gait cycles.   
@@ -140,7 +159,13 @@ Given the nature of the experimental study, the subjects performed varying tasks
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
-<span style="color: blue;">I stopped here </span>
+
+```{r subgroups}
+
+
+```
+
+<span style="color: blue;">------------------I stopped here--------------------- </span>
 
 
 ---
