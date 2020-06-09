@@ -1,11 +1,11 @@
 ---
 title: "A personalized and non-parametric framework for detecting changes in gait cycles"
 author:
-  - name: "Saeb Ragani Lamooki ^[Email: saebraga@buffalo.edu]"
+  - name: "Saeb Ragani Lamooki ^[Email: saebraga@buffalo.edu | Website: <a href=\"https://www.linkedin.com/in/saeb-ragani-lamooki-123a9658/\">LinkedIn</a>]"
     affiliation: Department of Mechanical & Aerospace Engineering, University at Buffalo
-  - name: "Jiyeon Kang ^[Email: jiyeonk@buffalo.edu | Phone: +1-716-645-6063 | Website: <a href=\"http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/j-jang.html\">University at Buffalo Official</a> ]"
+  - name: "Jiyeon Kang ^[Email: jiyeonk@buffalo.edu | Phone: +1-716-645-6063 | Website: <a href=\"http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/j-jang.html\">University at Buffalo Official</a>]"
     affiliation: Department of Mechanical & Aerospace Engineering, University at Buffalo
-  - name: "Lora A. Cavuoto ^[Email: loracavu@buffalo.edu | Phone: +1-716-645-4696 | Website: <a href=\"http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/cavuoto-lora.html\">University at Buffalo Official</a> ]"
+  - name: "Lora A. Cavuoto ^[Email: loracavu@buffalo.edu | Phone: +1-716-645-4696 | Website: <a href=\"http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/cavuoto-lora.html\">University at Buffalo Official</a>]"
     affiliation: Department of Industrial and Systems Engineering, University at Buffalo
   - name: "Fadel M. Megahed ^[Email: fmegahed@miamioh.edu | Phone: +1-513-529-4185 | Website: <a href=\"https://miamioh.edu/fsb/directory/?up=/directory/megahefm\">Miami University Official</a>]"
     affiliation: Farmer School of Business, Miami University
