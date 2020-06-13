@@ -61,6 +61,8 @@ if(length(newPackages) > 0) install.packages(newPackages)
 # using the library command to load all packages; invisible used to avoid printing all packages and dependencies used
 invisible(lapply(packages, library, character.only = TRUE))
 
+source("Functions.R") # our custom built functions
+
 set.seed(2020)
 startTime = Sys.time()
 ```
