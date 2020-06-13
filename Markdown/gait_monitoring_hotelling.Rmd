@@ -86,7 +86,6 @@ The code chunk below provides our code for reading the three different datasets.
 # ------------------------------------------------------------------------
 subject_heights = read.csv("https://raw.githubusercontent.com/fmegahed/fatigue-changepoint/master/Data/Raw/DemographicData.csv") %>%   pull(Height) %>% `*` (0.01) %>%  .[-13] # pull height and convert into meters
 
-
 # Computing gait features based on experimental data from Baghdadi et al. (2019):
 # -------------------------------------------------------------------------------
 featureFiles = list.files(path = "../Data/matFiles/Features/", pattern = "*.mat", full.names = TRUE)
