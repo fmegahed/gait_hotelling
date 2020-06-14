@@ -26,6 +26,8 @@ output:
     in_header: structure.tex
 ---
 
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE,
@@ -35,7 +37,12 @@ knitr::opts_chunk$set(echo = TRUE,
                       verbose = FALSE,
                       dpi = 600)
 options(qwraps2_markup = "markdown")
+
+
 ```
+
+
+
 
 ---
 
@@ -220,15 +227,17 @@ names(subgroupList) <- c(paste0("subject", c(1:13, 15)))
 ```
 
 
-# $T^2$ Calculations on Gait Acceleration Profiles
+# $T^2$ Calculations
+
+## $T^2$ Calculations on Gait Acceleration Profiles
 
 Initialize.
 
 
-```{r phase 0&1&2}
+```{r T2Profiles}
 
 T2List <- list()
-for (id in length(subgroupList)) {
+for (id in seq(length(subgroupList))) {
   
   X0 <- subgroupList[[id]]$Acc$X0
   
@@ -282,14 +291,338 @@ for (id in length(subgroupList)) {
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
   
-  T2List[[id]] <- list(T2=T2, UCL=UCL)
+  T2Features[[id]] <- list(T2=T2, UCL=UCL)
 
 }
-names(T2List) <- c(paste0("subject", c(1:13, 15)))
+names(T2Features) <- c(paste0("subject", c(1:13, 15)))
+
+```
+
+## Plots of $T^2$ on Gait Acceleration Profiles {.tabset .tabset-fade}
+
+Initialize.
+
+```{r T2_plot_acc, fig.align='center', results='asis', out.width="100%"}
+
+load(file="../Data/RGenerated/T2Out_ACC.Rdata")
+
+for (id in setdiff(1:15, c(13))) {
+  T2 <- get(paste0("sub", id, "T2"))$T2
+  UCL <- get(paste0("sub", id, "T2"))$UCL
+  end <- length(T2)
+  x2 <- 10 + end
+  
+  color1 <- ifelse(T2[1:20]>UCL, "OC", "IC")
+  T2_df_1 <- data.frame(x=11:30, T2=T2[1:20], shape="Phase 1", color=color1)
+  color2 <- ifelse(T2[21:end]>UCL, "OC", "IC")
+  T2_df_2 <- data.frame(x=31:x2, T2=T2[21:end], shape="Phase2", color=color2)
+  T2_12_df <- rbind(T2_df_1, T2_df_2)
+  UCL_df <- data.frame(UCL=UCL, ltype="UCL")
+  
+  T2_plot <- ggplot(data=T2_12_df) +
+    geom_point(aes(x=x, y=T2, shape=shape, col=color), size=2.5) +
+    geom_line(aes(x=x, y=T2)) +
+    geom_hline(aes(yintercept=UCL, linetype=ltype), data=UCL_df) +
+    xlab(element_blank()) + ylab(element_blank()) +
+    theme(legend.title=element_blank()) + # This removes the legend title
+    theme(legend.position=c(.1, .68)) +
+    theme(legend.text = element_text(size=10)) +
+    scale_x_continuous(limits = c(0, x2)) +
+    scale_shape_manual(values = c(6, 16)) +
+    scale_color_manual(values = c("black", "red")) +
+    theme(axis.text = element_text(size=15)) +
+    ggtitle(paste0("Subject ", id)) +
+    theme(plot.title = element_text(size = 15, hjust=0.5, margin = margin(t=10, b=-20))) #+
+  # theme(plot.margin = margin(0,0,0,0, "in"))
+  
+  # ggsave(paste0("T2_acc_sub", id, ".png"), width = 10, height = 5, dpi = "retina", units = "in", device="png", scale = 1, path = "../Data/Figures/")
+  
+  
+  cat('##',paste0("Subject", id), "{-}",'\n')
+  print(list(T2_plot, ""))
+  cat('\n \n')
+  
+}
+```
+
+
+## $T^2$ Calculations on Gait Features
+
+Initialize.
+
+
+```{r T2Features}
+
+T2List <- list()
+for (id in seq(length(subgroupList))) {
+  
+  X0 <- subgroupList[[id]]$Acc$X0
+  
+  ############################# Phase0
+  ############################# Remove single outliers in number of passes
+  # set.seed(2020) ???????????????????????????
+  pass <- 1
+  for (i in 1:pass) {
+    UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
+    ######################### Find T2 for original X0 and remove outliers from subgroups
+    X0Pooled <- do.call(rbind, X0)
+    T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
+      rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+      apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+    
+    tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
+    OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
+    X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
+  }
+  
+  X0Pooled <- do.call(rbind, X0)
+  X0PooledMean <- apply(X0Pooled, 2, mean)
+  
+  ############################# Within batch covariance; computed from phase0 after outlier removal
+  S_w <- X0 %>%
+    lapply(colMeans) %>%
+    mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
+    mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
+    lapply(function(x) {t(x) %*% x}) %>%
+    Reduce(f=`+`) %>%
+    `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+  
+  ############################# Phase1&2
+  ############################# Read phase 1&2 subgroups
+  X1 <- subgroupList[[id]]$Acc$X1
+  X2 <- subgroupList[[id]]$Acc$X2
+  
+  ######################### Compute T2 in phase1
+  X1Mean <- sapply(X1, colMeans) %>% t()
+  T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  ######################### Bootstrap UCL using phase 1 data
+  set.seed(2020) # ???????????????????????????????????????
+  sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
+  UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
+  
+  ######################### T2 for phase2 data
+  X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
+  
+  T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  T2LHD[[id]] <- list(T2=T2, UCL=UCL)
+
+}
+names(T2LHD) <- c(paste0("subject", c(1:13, 15)))
+
+```
+
+## Plots of $T^2$ on Gait Features {.tabset .tabset-fade}
+
+Initialize.
+
+```{r T2_plot_LHD, fig.align='center', results='asis', out.width="100%"}
+
+load(file="../Data/RGenerated/T2Out_LHD.Rdata")
+
+for (id in setdiff(1:15, c(13))) { #in setdiff(1:15, c(13))) {
+
+  T2 <- get(paste0("sub", id, "T2"))$T2
+  UCL <- get(paste0("sub", id, "T2"))$UCL
+  end <- length(T2)
+
+  x2 <- 10 + end
+  color1 <- ifelse(T2[1:20]>UCL, "OC", "IC")
+  T2_df_1 <- data.frame(x=11:30, T2=T2[1:20], shape="Phase 1", color=color1)
+  color2 <- ifelse(T2[21:end]>UCL, "OC", "IC")
+  T2_df_2 <- data.frame(x=31:x2, T2=T2[21:end], shape="Phase2", color=color2)
+  T2_12_df <- rbind(T2_df_1, T2_df_2)
+  UCL_df <- data.frame(UCL=UCL, ltype="UCL")
+
+  T2_plot <- ggplot(data=T2_12_df) +
+    geom_point(aes(x=x, y=T2, shape=shape, col=color), size=2.5) +
+    geom_line(aes(x=x, y=T2)) +
+    geom_hline(aes(yintercept=UCL, linetype=ltype), data=UCL_df) +
+    xlab(element_blank()) + ylab(element_blank()) +
+    theme(legend.title=element_blank()) + # This removes the legend title
+    theme(legend.position=c(.1, .68)) +
+    theme(legend.text = element_text(size=10)) +
+    scale_x_continuous(limits = c(0, x2)) +
+    scale_shape_manual(values = c(6, 16)) +
+    scale_color_manual(values = c("black", "red")) +
+    theme(axis.text = element_text(size=15)) +
+    ggtitle(paste0("Subject ", id)) +
+    theme(plot.title = element_text(size = 15, hjust=0.5, margin = margin(t=10, b=-20))) #+
+  # theme(plot.margin = margin(0,0,0,0, "in"))
+
+  # ggsave(paste0("Tsq_sub", id, ".png"), width = 10, height = 5, dpi = "retina", units = "in", device="png", scale = 1, path = "../Data/RGenerated/")
+
+  cat('##',paste0("Subject", id), "{-}",'\n')
+  print(list(T2_plot, ""))
+  cat('\n \n')
+}
+```
+
+
+## Decomposition of Feature $T^2$
+
+Initialize.
+
+```{r T2_plot_LHD}
+
+
+################################### Read files
+# load(file="C:/Users/Saeb/Dropbox/SPC Gait Profile/Data/RGenerated/T2_LHD_Batch_Phase012.Rdata")
+# load(file="C:/Users/Saeb/Dropbox/SPC Gait Profile/Data/RGenerated/ph0_out_LHD.Rdata")
+
+# ??????????????????????????????????????????????????????
+
+###################################
+# for (id in setdiff(1:15, c(13))) {
+id <- 1
+X0 <- get(paste0("sub", id, "X0Upd"))
+X1 <- get(paste0("sub", id, "LHD"))$X1
+X2 <- get(paste0("sub", id, "LHD"))$X2
+
+###################################### Phase1 T2 based on S_w
+n0 <- sapply(X0, nrow)
+X0Pooled <- do.call(rbind, X0)
+X0PooledMean <- apply(X0Pooled, 2, mean)
+alpha <- 0.01
+
+######################## S_w Mason
+S_w <- X0 %>%
+  lapply(colMeans) %>%
+  mapply(FUN=rep.row, n0) %>%
+  mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
+  lapply(function(x) {-x}) %>%
+  lapply(function(x) {t(x) %*% x}) %>%
+  Reduce(f=`+`) %>%
+  `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+
+######################### Compute T2 in phase1
+X1Mean <- sapply(X1, colMeans) %>% t()
+Tsq1 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
+  apply(MARGIN=1, function(x) x %*% solve(S_w) %*% x)
+
+######################### Bootstrap the T2 values in phase1 to find the 99th percentile
+set.seed(2020)
+sampled <- matrix(sample(Tsq1, 1000 * length(Tsq1), replace = T), ncol=length(Tsq1), byrow=T)
+Tsq_99p <- apply(sampled, 1, quantile, probs=1-alpha)
+UCL <- mean(Tsq_99p)
+
+######################### Compute T squared for phase2 data
+X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
+
+T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
+  apply(MARGIN=1, function(x) x %*% solve(S_w) %*% x)
+
+########################################################################
+############################################# T2 Decomposition and UCL's
+p <- ncol(X1[[1]]) # number of features
+t3 <- which(T2 > UCL)
+
+# inititialize the decomposition matrix
+q <- init.decomp(p=p)
+
+# Find the control limit for each component of the decomposition
+for(i in 1:nrow(q)) {
+  b <- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] > 0)
+  di<-length(b)
+  
+  Tsq1 <- rep.row(X0PooledMean[b], length(X1)) %>% -(X1Mean[,b]) %>%
+    apply(MARGIN=1, function(x) x %*% solve(S_w[b,b]) %*% x)
+  
+  set.seed(2020)
+  sampled <- matrix(sample(Tsq1, 1000 * length(Tsq1), replace = T), ncol=20, byrow=T)
+  Tsq_99p <- apply(sampled, 1, quantile, probs=1-alpha)
+  
+  q[i,2] <- mean(Tsq_99p)
+}
+
+############################## Decompose T2 for every out of control point
+q_list <- list("list")
+r <- 1
+for(ii in 1:length(t3)){
+  for(i in 1:nrow(q)) {
+    b <- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] > 0)
+    q[i,1] <- t(X0PooledMean[b]-X12Mean[t3[ii],][b]) %*%
+      solve(S_w[b,b]) %*%
+      (X0PooledMean[b]-X12Mean[t3[ii],][b])
+  }
+  ############################# Print decomposed elements
+  colnames(q)<-c("t2 decomp", "UCL", 1:p)
+  print(list("Decomposition of"=t3[ii]))
+  print(round(q,4))
+  
+  tmp <- list(q)
+  names(tmp) <- paste0("q for subgroup number ", t3[ii])
+  
+  q_list[[r]] <- tmp
+  r <- r+1
+}
+
+# }
 
 ```
 
 
+
+## 2D Ellipse plots {.tabset .tabset-fade}
+
+Initialize.
+
+
+```{r T2_plot_LHD, fig.align='center', results='asis', out.width="100%"}
+#####################################################################
+#################################################### 2D ellipse plot
+id <- 1 # Select the subject number
+f <- c(2,3) # Select 2 features based on the decomposition interpretation
+
+########################################## Univariate CL's and 2D plot limits
+XLim <- c(X0PooledMean[f[1]]-sqrt(S_w[f[1],f[1]]*q[f[1],2]),
+          X0PooledMean[f[1]]+sqrt(S_w[f[1],f[1]]*q[f[1],2]))
+
+YLim <- c(X0PooledMean[f[2]]-sqrt(S_w[f[2],f[2]]*q[f[2],2]),
+          X0PooledMean[f[2]]+sqrt(S_w[f[2],f[2]]*q[f[2],2]))
+
+xlim <- c(min(XLim) - 1.2*diff(XLim), max(XLim) + 1.2*diff(XLim))
+ylim <- c(min(YLim) - 1.2*diff(YLim), max(YLim) + 1.2*diff(YLim))
+
+#####################################
+ngrid <- 100
+grid <- cbind(seq(xlim[1], xlim[2], length = ngrid),
+              seq(ylim[1], ylim[2], length = ngrid))
+
+#########################################  T2 for grid data
+T2_grid <- apply(expand.grid(grid[,1], grid[,2]), 1,
+                 function(x) {(x- X0PooledMean[f]) %*% solve(S_w[f,f]) %*% (x- X0PooledMean[f])})
+T2_grid <- matrix(T2_grid, ngrid, ngrid)
+
+################ Plot the contour
+# !!!!!!!!!!!!!!!!!!!!!!!! Font size and cex and axis and labels ????ggplot
+plot(1 ,1, type = "o", xlim = xlim, ylim = ylim)
+idx <- apply(q[,3:5], MARGIN=1, function(r) all(c(f,0) %in% r)) %>% which()
+contour(grid[,1], grid[,2], T2_grid, levels=q[idx,2], drawlabels=T, add=T)
+
+################ Plot phase0 data
+center0 <- X0 %>% lapply(function(x) {x[,f]}) %>% sapply(colMeans) %>% t()
+points(center0[,1], center0[,2], pch=3, cex=2, col="blue", lwd=2)
+points(X0Pooled[,f], pch=1, cex=0.5, col="blue")
+
+################ plot phase 1 and 2 data by subgroup number
+center12 <- c(X1,X2) %>% lapply(colMeans) %>% sapply(function(x) {x[f]}) %>% t()
+v <- which(T2>UCL)
+labels <- T2 %>% t() %>% as.data.frame() %>% names() %>% gsub(pattern='V', replacement='')
+
+text(center12, labels=labels, cex = 1,
+     col = { col <- rep(1, nrow(center12))
+     col[v] <- "red"
+     col })
+
+################ Plot univariate CL's
+abline(v=XLim, h=YLim, lty=3)
+
+}
+```
 
 
 
