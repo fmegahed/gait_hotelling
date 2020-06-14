@@ -335,7 +335,6 @@ Initialize.
 
 
 ```{r T2Features}
-
 T2Features <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$LHD$X0 %>% lapply(function(x) {x=x[,1:3]}) # Last column contains experiment time
@@ -381,14 +380,12 @@ for (id in seq(length(subgroupList))) {
   
   ######################### T2 for phase2 data
   X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
-  
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
   
   T2Features[[id]] <- list(T2=T2, UCL=UCL)
 }
 names(T2Features) <- c(paste0("subject", c(1:12, 14:15)))
-
 ```
 
 ## Plots of $T^2$ on Gait Features {.tabset .tabset-fade}
@@ -398,8 +395,8 @@ Initialize.
 ```{r T2PlotFeatures, fig.align='center', results='asis', out.width="100%"}
 
 for (id in seq(length(subgroupList))) {
-  T2 <- T2Profiles[[id]]$T2
-  UCL <- T2Profiles[[id]]$UCL
+  T2 <- T2Features[[id]]$T2
+  UCL <- T2Features[[id]]$UCL
   color <- ifelse(T2>UCL, "OC", "IC")
   T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
                       shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
@@ -430,19 +427,14 @@ for (id in seq(length(subgroupList))) {
 }
 ```
 
+# Diagnosis of Gait Features
 
-## Decomposition of Feature $T^2$
+## Decomposition of Features $T^2$
 
 Initialize.
 
-```{r T2_plot_LHD}
+```{r T2Decompose}
 
-
-################################### Read files
-# load(file="C:/Users/Saeb/Dropbox/SPC Gait Profile/Data/RGenerated/T2_LHD_Batch_Phase012.Rdata")
-# load(file="C:/Users/Saeb/Dropbox/SPC Gait Profile/Data/RGenerated/ph0_out_LHD.Rdata")
-
-# ??????????????????????????????????????????????????????
 
 ###################################
 # for (id in setdiff(1:15, c(13))) {
@@ -540,7 +532,7 @@ for(ii in 1:length(t3)){
 Initialize.
 
 
-```{r T2_plot_LHD, fig.align='center', results='asis', out.width="100%"}
+```{r T2Ellipse, fig.align='center', results='asis', out.width="100%"}
 #####################################################################
 #################################################### 2D ellipse plot
 id <- 1 # Select the subject number
