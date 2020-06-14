@@ -54,6 +54,8 @@ checkpoint("2020-06-08")
 # check if packages are not installed; if yes, install missing packages
 packages = c("tidyverse", "magrittr", # typical data analysis packages
              "foreach", "parallel", # packages used for parallelizing some code chunks
+             "MALDIquant", # match closest points between two vectors
+             "MASS", # calculates the generalized inverse matrix
              "R.matlab")
 newPackages = packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(newPackages) > 0) install.packages(newPackages)
@@ -61,7 +63,7 @@ if(length(newPackages) > 0) install.packages(newPackages)
 # using the library command to load all packages; invisible used to avoid printing all packages and dependencies used
 invisible(lapply(packages, library, character.only = TRUE))
 
-source("Functions.R") # our custom built functions
+source("./Functions.R") # our custom built functions
 
 set.seed(2020)
 startTime = Sys.time()
@@ -138,18 +140,19 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, "Subject[:digit:]*", 
 
 ## Data Preprocessing
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
-
 ```{r dataCleaning}
+
 for (i in seq(length(rawSubjectsData))) {
-  videoDataList[[i]] %<>%  
-    na.omit() %>% # removing NA observations
+  videoDataList[[i]] %<>%
+    select(Leaves, Enters) %>%
+    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+    as.data.frame %>%
     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
     filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-  
-  
 }
 
 ```
+
 
 ## Rational Subgroups
 Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:    
@@ -159,13 +162,135 @@ Given the nature of the experimental study, the subjects performed varying tasks
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
-
 ```{r subgroups}
-#
+numRows = lengths(subjectProfilesList)/5
+confidence <- videoDataList %>% lapply(function(x) {mean(x[,2] - x[,1])}) %>%
+  do.call(what=c) %>% `*` (0.05) # 5% confidence for each subgroup
+
+subgroupList <- list()
+for (id in seq(length(rawSubjectsData))) {
+  
+  aM <- subjectProfilesList[[id]] %>% do.call(what=c) %>%
+    .[(numRows[[id]]+1):(2*numRows[id])] %>%
+    lapply(as.vector)
+  
+  expT <- subjectProfilesList[[id]] %>% do.call(what=c) %>%
+    .[(4*numRows[[id]]+1):(5*numRows[id])] %>%
+    lapply(function(x) {x[1,1]}) %>% do.call(what=c)
+  
+  ###########################################################
+  # Match times of walking cycles, extracted from videos, against the experimental times
+  leaveIdx <- match.closest(videoDataList[[id]]$Leaves + confidence[id], expT)
+  enterIdx <- match.closest(videoDataList[[id]]$Enters - confidence[id], expT)
+  
+  rmIdx <- c(3000, which(enter_index - leave_index < 5))
+  leaveIdx <- leaveIdx[-rmIdx]
+  enterIdx <- enterIdx[-rmIdx]
+  
+  ########################################################## Create subgroups
+  aMList <- list()
+  LHDList <- list()
+  for (i in 1:length(leaveIdx)) {
+    aMList[[i]] <- aM[leaveIdx[i]:enterIdx[i]]
+    LHDList[[i]] <- subjectFeaturesList[[id]][leaveIdx[i]:enterIdx[i],]
+  }
+  
+  ######################################### Remove subgroups with length < 20
+  LHDList %<>% .[-{which(lengths(aMList) < 20) %>% c(3000)}]
+  aMList %<>% .[-{which(lengths(aMList) < 20) %>% c(3000)}]
+  
+  ######################################### Remove observations with profiles< 2nd percentile profile length; This is done to cut all profiles at this length (equal number of features)
+  cutLen <- aMList %>% do.call(what=c) %>% lengths() %>% quantile(probs=0.02)
+  for (i in 1:length(aMList)) {
+    rmIdx <- which(lengths(aMList[[i]]) < cutLen) %>% c(3000)
+    aMList[[i]] <- aMList[[i]][-rmIdx]
+    LHDList[[i]] <- LHDList[[i]][-rmIdx,]
+  }
+  
+  ######################################## Create a matrix with cutLen number of columns in each profile subgroup
+  aMList %<>% lapply(function(x) {do.call(rbind, x)}) %>%
+    lapply(function(x) {x[,1:cutLen]})
+  
+  ############################################ Lengths of subgroups 0&1: 10&20
+  subgroupList[[id]] <- list(Acc = list(X0=aMList[1:10], X1=aMList[11:30], X2=aMList[31:length(aMList)]),
+                             LHD = list(X0=LHDList[1:10], X1=LHDList[11:30], X2=LHDList[31:length(LHDList)]))
+}
+names(subgroupList) <- c(paste0("subject", c(1:13, 15)))
 
 ```
 
-<span style="color: blue;">------------------I stopped here--------------------- </span>
+
+# $T^2$ Calculations on Gait Acceleration Profiles
+
+Initialize.
+
+
+```{r phase 0&1&2}
+
+T2List <- list()
+for (id in length(subgroupList)) {
+  
+  X0 <- subgroupList[[id]]$Acc$X0
+  
+  ############################# Phase0
+  ############################# Remove single outliers in number of passes
+  # set.seed(2020) ???????????????????????????
+  pass <- 1
+  for (i in 1:pass) {
+    UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
+    ######################### Find T2 for original X0 and remove outliers from subgroups
+    X0Pooled <- do.call(rbind, X0)
+    T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
+      rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+      apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+    
+    tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
+    OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
+    X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
+  }
+  
+  X0Pooled <- do.call(rbind, X0)
+  X0PooledMean <- apply(X0Pooled, 2, mean)
+  
+  ############################# Within batch covariance; computed from phase0 after outlier removal
+  S_w <- X0 %>%
+    lapply(colMeans) %>%
+    mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
+    mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
+    lapply(function(x) {t(x) %*% x}) %>%
+    Reduce(f=`+`) %>%
+    `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+  
+  ############################# Phase1&2
+  ############################# Read phase 1&2 subgroups
+  X1 <- subgroupList[[id]]$Acc$X1
+  X2 <- subgroupList[[id]]$Acc$X2
+  
+  ######################### Compute T2 in phase1
+  X1Mean <- sapply(X1, colMeans) %>% t()
+  T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  ######################### Bootstrap UCL using phase 1 data
+  set.seed(2020) # ???????????????????????????????????????
+  sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
+  UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
+  
+  ######################### T2 for phase2 data
+  X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
+  
+  T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  T2List[[id]] <- list(T2=T2, UCL=UCL)
+
+}
+names(T2List) <- c(paste0("subject", c(1:13, 15)))
+
+```
+
+
+
 
 
 ---
