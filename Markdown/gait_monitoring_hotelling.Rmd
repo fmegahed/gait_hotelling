@@ -299,43 +299,39 @@ names(T2Profiles) <- c(paste0("subject", c(1:12, 14:15)))
 
 Initialize.
 
-```{r T2_plot_acc, fig.align='center', results='asis', out.width="100%"}
+```{r T2PlotProfiles, fig.align='center', results='asis', out.width="100%"}
 
-# for (id in setdiff(1:15, c(13))) {
-
-id <- 1
-
-T2 <- T2Profiles[[id]]$T2
-UCL <- T2Profiles[[id]]$UCL
-
-color <- ifelse(T2>UCL, "OC", "IC")
-T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
-                    shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
-
-UCL.df <- data.frame(UCL=UCL, ltype="ltype")
-
-
-ggplot(data=T2.df) + 
-  geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
-  geom_line(aes(x=subgroup, y=T2)) +
-  scale_shape_manual(values = c(6, 16)) +
-  scale_color_manual(values = c("black", "red")) +
-  geom_hline(yintercept=UCL) +
-  annotate("text", 2, UCL, vjust=-1, label="Cutoff") +
-  ggtitle(paste0("Subject ", id)) +
+for (id in seq(length(subgroupList))) {
+  T2 <- T2Profiles[[id]]$T2
+  UCL <- T2Profiles[[id]]$UCL
+  color <- ifelse(T2>UCL, "OC", "IC")
+  T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+                      shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
   
+  T2Plot <- ggplot(data=T2.df) + 
+    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=subgroup, y=T2)) +
+    
+    geom_hline(yintercept=UCL) +
+    annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
+    
+    scale_shape_manual(values = c(6, 16)) +
+    scale_color_manual(values = c("black", "red")) +
+    ggtitle(paste0("Subject ", id)) +
+    
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .68),
+          legend.text=element_text(size=10),
+          legend.key = element_rect(fill="grey"))
   
-  theme(plot.title = element_text(size = 15, hjust=0.5, margin = margin(t=10, b=-20))) +
-  theme(axis.text = element_text(size=15)) +
-  theme(legend.title=element_blank()) + # This removes the legend title
-  theme(legend.position=c(.1, .68)) +
-  theme(legend.text = element_text(size=10)) +
-
-cat('##',paste0("Subject", id), "{-}",'\n')
-print(list(T2_plot, ""))
-cat('\n \n')
-
-# }
+  cat('##',paste0("Subject", id), "{-}",'\n')
+  print(list(T2Plot, ""))
+  cat('\n \n')
+}
 ```
 
 
@@ -346,64 +342,65 @@ Initialize.
 
 ```{r T2Features}
 
-T2List <- list()
-for (id in seq(length(subgroupList))) {
-  
-  X0 <- subgroupList[[id]]$Acc$X0
-  
-  ############################# Phase0
-  ############################# Remove single outliers in number of passes
-  # set.seed(2020) ???????????????????????????
-  pass <- 1
-  for (i in 1:pass) {
-    UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
-    ######################### Find T2 for original X0 and remove outliers from subgroups
-    X0Pooled <- do.call(rbind, X0)
-    T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
-      rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
-      apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
-    
-    tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
-    OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
-    X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
-  }
-  
-  X0Pooled <- do.call(rbind, X0)
-  X0PooledMean <- apply(X0Pooled, 2, mean)
-  
-  ############################# Within batch covariance; computed from phase0 after outlier removal
-  S_w <- X0 %>%
-    lapply(colMeans) %>%
-    mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
-    mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
-    lapply(function(x) {t(x) %*% x}) %>%
-    Reduce(f=`+`) %>%
-    `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
-  
-  ############################# Phase1&2
-  ############################# Read phase 1&2 subgroups
-  X1 <- subgroupList[[id]]$Acc$X1
-  X2 <- subgroupList[[id]]$Acc$X2
-  
-  ######################### Compute T2 in phase1
-  X1Mean <- sapply(X1, colMeans) %>% t()
-  T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
-    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  
-  ######################### Bootstrap UCL using phase 1 data
-  set.seed(2020) # ???????????????????????????????????????
-  sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
-  UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
-  
-  ######################### T2 for phase2 data
-  X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
-  
-  T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
-    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  
-  T2Features[[id]] <- list(T2=T2, UCL=UCL)
+T2Features <- list()
+# for (id in seq(length(subgroupList))) {
 
+id <- 1
+X0 <- subgroupList[[id]]$LHD$X0
+
+############################# Phase0
+############################# Remove single outliers in number of passes
+# set.seed(2020) ???????????????????????????
+pass <- 1
+for (i in 1:pass) {
+  UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
+  ######################### Find T2 for original X0 and remove outliers from subgroups
+  X0Pooled <- do.call(rbind, X0)
+  T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
+    rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+    apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+  
+  tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
+  OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
+  X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
 }
+
+X0Pooled <- do.call(rbind, X0)
+X0PooledMean <- apply(X0Pooled, 2, mean)
+
+############################# Within batch covariance; computed from phase0 after outlier removal
+S_w <- X0 %>%
+  lapply(colMeans) %>%
+  mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
+  mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
+  lapply(function(x) {t(x) %*% x}) %>%
+  Reduce(f=`+`) %>%
+  `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+
+############################# Phase1&2
+############################# Read phase 1&2 subgroups
+X1 <- subgroupList[[id]]$Acc$X1
+X2 <- subgroupList[[id]]$Acc$X2
+
+######################### Compute T2 in phase1
+X1Mean <- sapply(X1, colMeans) %>% t()
+T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
+  apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+
+######################### Bootstrap UCL using phase 1 data
+set.seed(2020) # ???????????????????????????????????????
+sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
+UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
+
+######################### T2 for phase2 data
+X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
+
+T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
+  apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+
+T2Features[[id]] <- list(T2=T2, UCL=UCL)
+
+# }
 names(T2Features) <- c(paste0("subject", c(1:13, 15)))
 
 ```
@@ -412,44 +409,37 @@ names(T2Features) <- c(paste0("subject", c(1:13, 15)))
 
 Initialize.
 
-```{r T2_plot_LHD, fig.align='center', results='asis', out.width="100%"}
+```{r T2PlotFeatures, fig.align='center', results='asis', out.width="100%"}
 
-load(file="../Data/RGenerated/T2Out_LHD.Rdata")
-
-for (id in setdiff(1:15, c(13))) { #in setdiff(1:15, c(13))) {
-
-  T2 <- get(paste0("sub", id, "T2"))$T2
-  UCL <- get(paste0("sub", id, "T2"))$UCL
-  end <- length(T2)
-
-  x2 <- 10 + end
-  color1 <- ifelse(T2[1:20]>UCL, "OC", "IC")
-  T2_df_1 <- data.frame(x=11:30, T2=T2[1:20], shape="Phase 1", color=color1)
-  color2 <- ifelse(T2[21:end]>UCL, "OC", "IC")
-  T2_df_2 <- data.frame(x=31:x2, T2=T2[21:end], shape="Phase2", color=color2)
-  T2_12_df <- rbind(T2_df_1, T2_df_2)
-  UCL_df <- data.frame(UCL=UCL, ltype="UCL")
-
-  T2_plot <- ggplot(data=T2_12_df) +
-    geom_point(aes(x=x, y=T2, shape=shape, col=color), size=2.5) +
-    geom_line(aes(x=x, y=T2)) +
-    geom_hline(aes(yintercept=UCL, linetype=ltype), data=UCL_df) +
-    xlab(element_blank()) + ylab(element_blank()) +
-    theme(legend.title=element_blank()) + # This removes the legend title
-    theme(legend.position=c(.1, .68)) +
-    theme(legend.text = element_text(size=10)) +
-    scale_x_continuous(limits = c(0, x2)) +
+for (id in seq(length(subgroupList))) {
+  T2 <- T2Profiles[[id]]$T2
+  UCL <- T2Profiles[[id]]$UCL
+  color <- ifelse(T2>UCL, "OC", "IC")
+  T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+                      shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
+  
+  T2Plot <- ggplot(data=T2.df) + 
+    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=subgroup, y=T2)) +
+    
+    geom_hline(yintercept=UCL) +
+    annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
+    
     scale_shape_manual(values = c(6, 16)) +
     scale_color_manual(values = c("black", "red")) +
-    theme(axis.text = element_text(size=15)) +
     ggtitle(paste0("Subject ", id)) +
-    theme(plot.title = element_text(size = 15, hjust=0.5, margin = margin(t=10, b=-20))) #+
-  # theme(plot.margin = margin(0,0,0,0, "in"))
-
-  # ggsave(paste0("Tsq_sub", id, ".png"), width = 10, height = 5, dpi = "retina", units = "in", device="png", scale = 1, path = "../Data/RGenerated/")
-
+    
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .68),
+          legend.text=element_text(size=10),
+          legend.key = element_rect(fill="grey"))
+  
   cat('##',paste0("Subject", id), "{-}",'\n')
-  print(list(T2_plot, ""))
+  print(list(T2Plot, ""))
   cat('\n \n')
 }
 ```
