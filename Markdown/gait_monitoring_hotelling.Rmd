@@ -235,14 +235,12 @@ Initialize.
 
 
 ```{r T2Profiles}
-
 T2List <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$Acc$X0
   
   ############################# Phase0
   ############################# Remove single outliers in number of passes
-  # set.seed(2020) ???????????????????????????
   pass <- 1
   for (i in 1:pass) {
     UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
@@ -261,8 +259,7 @@ for (id in seq(length(subgroupList))) {
   X0PooledMean <- apply(X0Pooled, 2, mean)
   
   ############################# Within batch covariance; computed from phase0 after outlier removal
-  S_w <- X0 %>%
-    lapply(colMeans) %>%
+  S_w <- X0 %>% lapply(colMeans) %>%
     mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
     mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
     lapply(function(x) {t(x) %*% x}) %>%
@@ -280,7 +277,6 @@ for (id in seq(length(subgroupList))) {
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
   
   ######################### Bootstrap UCL using phase 1 data
-  set.seed(2020) # ???????????????????????????????????????
   sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
   UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
   
@@ -289,10 +285,8 @@ for (id in seq(length(subgroupList))) {
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
   T2Profiles[[id]] <- list(T2=T2, UCL=UCL)
-  
 }
 names(T2Profiles) <- c(paste0("subject", c(1:12, 14:15)))
-
 ```
 
 ## Plots of $T^2$ on Gait Acceleration Profiles {.tabset .tabset-fade}
@@ -350,27 +344,23 @@ X0 <- subgroupList[[id]]$LHD$X0
 
 ############################# Phase0
 ############################# Remove single outliers in number of passes
-# set.seed(2020) ???????????????????????????
 pass <- 1
 for (i in 1:pass) {
   UCL0 <- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
   ######################### Find T2 for original X0 and remove outliers from subgroups
   X0Pooled <- do.call(rbind, X0)
-  T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
-    rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+  T2 <- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
     apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
   
   tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
   OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
   X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
 }
-
 X0Pooled <- do.call(rbind, X0)
 X0PooledMean <- apply(X0Pooled, 2, mean)
 
 ############################# Within batch covariance; computed from phase0 after outlier removal
-S_w <- X0 %>%
-  lapply(colMeans) %>%
+S_w <- X0 %>% lapply(colMeans) %>%
   mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
   mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %>%
   lapply(function(x) {t(x) %*% x}) %>%
@@ -379,8 +369,8 @@ S_w <- X0 %>%
 
 ############################# Phase1&2
 ############################# Read phase 1&2 subgroups
-X1 <- subgroupList[[id]]$Acc$X1
-X2 <- subgroupList[[id]]$Acc$X2
+X1 <- subgroupList[[id]]$LHD$X1
+X2 <- subgroupList[[id]]$LHD$X2
 
 ######################### Compute T2 in phase1
 X1Mean <- sapply(X1, colMeans) %>% t()
@@ -388,7 +378,6 @@ T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
   apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
 
 ######################### Bootstrap UCL using phase 1 data
-set.seed(2020) # ???????????????????????????????????????
 sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
 UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
 
