@@ -490,12 +490,12 @@ names(qList) <- paste0("subject", c(1:12, 14:15))
 ```
 
 
-## 2D Ellipse plots {.tabset .tabset-fade}
+## 2D Ellipse plots
 
 Initialize.
 
 
-```{r T2Ellipse, fig.align='center', results='asis', out.width="100%"}
+```{r T2Ellipse}
 
 ################ Select subject number and features
 id <- 1 # Select the subject number
@@ -506,12 +506,8 @@ X0 <- X0Updated[[id]]$X0
 X1 <- subgroupList[[id]]$LHD$X1 %>% lapply(function(x) {x=x[,1:3]})
 X2 <- subgroupList[[id]]$LHD$X2 %>% lapply(function(x) {x=x[,1:3]})
 X0PooledMean <- do.call(rbind, X0) %>% colMeans()
-# X1Mean <- sapply(X1, colMeans) %>% t()
-# X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
 S_w <- SWList[[id]]$S_w
-
 q <- qList[[id]][[1]] # Read one of the q's as its 2nd column (q[,2]) are the control limits and thus the same across all subgroups in one subject
-
 T2 <- T2Features[[id]]$T2
 UCL <- T2Features[[id]]$UCL
 
