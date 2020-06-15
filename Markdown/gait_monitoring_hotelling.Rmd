@@ -151,7 +151,7 @@ In Section 2, we have read four different data sets and extracted the three gait
 
 for (i in seq(length(rawSubjectsData))) {
   videoDataList[[i]] %<>%
-    select(Leaves, Enters) %>%
+    dplyr::select(Leaves, Enters) %>%
     apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
     as.data.frame %>%
     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
@@ -169,7 +169,7 @@ Given the nature of the experimental study, the subjects performed varying tasks
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
-```{r subgroups}
+```{r subgroups, eval=FALSE}
 numRows = lengths(subjectProfilesList)/5
 confidence <- videoDataList %>% lapply(function(x) {mean(x[,2] - x[,1])}) %>%
   do.call(what=c) %>% `*` (0.05) # 5% confidence for each subgroup
@@ -234,7 +234,7 @@ names(subgroupList) <- c(paste0("subject", c(1:12, 14:15)))
 Initialize.
 
 
-```{r T2Profiles}
+```{r T2Profiles, eval=FALSE}
 T2List <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$Acc$X0
@@ -293,7 +293,7 @@ names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 
 Initialize.
 
-```{r T2ProfilesPlot, fig.align='center', results='asis', out.width="100%"}
+```{r T2ProfilesPlot, eval=FALSE, fig.align='center', results='asis', out.width="100%"}
 
 for (id in seq(length(subgroupList))) {
   T2 <- T2Profiles[[id]]$T2
@@ -334,7 +334,7 @@ for (id in seq(length(subgroupList))) {
 Initialize.
 
 
-```{r T2Features}
+```{r T2Features, eval=FALSE}
 T2Features <- list()
 SWList <- list()
 X0Updated <- list()
@@ -398,7 +398,7 @@ names(SWList) <- paste0("subject", c(1:12, 14:15))
 
 Initialize.
 
-```{r T2FeaturesPlot, fig.align='center', results='asis', out.width="100%"}
+```{r T2FeaturesPlot, eval=FALSE, fig.align='center', results='asis', out.width="100%"}
 
 for (id in seq(length(subgroupList))) {
   T2 <- T2Features[[id]]$T2
@@ -440,7 +440,7 @@ for (id in seq(length(subgroupList))) {
 Initialize.
 
 
-```{r T2Decompose}
+```{r T2Decompose, eval=FALSE}
 
 qList <- list()
 for (id in seq(length(subgroupList))) {
@@ -495,7 +495,7 @@ names(qList) <- paste0("subject", c(1:12, 14:15))
 Initialize.
 
 
-```{r T2Ellipse}
+```{r T2Ellipse, eval=FALSE}
 
 ################ Select subject number and features
 id <- 1 # Select the subject number

@@ -10,7 +10,7 @@
 
 
 
-<meta name="date" content="2020-06-09" />
+<meta name="date" content="2020-06-14" />
 
 <title>A personalized and non-parametric framework for detecting changes in gait cycles</title>
 
@@ -1603,7 +1603,7 @@ Department of Industrial and Systems Engineering, University at Buffalo<br><h4 c
 <address class="author_afil">
 Farmer School of Business, Miami University<br><h4 class="author">Allison Jones Farmer<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a></h4>
 <address class="author_afil">
-Farmer School of Business, Miami University<br><h4 class="date">June 09, 2020</h4>
+Farmer School of Business, Miami University<br><h4 class="date">June 14, 2020</h4>
 
 </div>
 
@@ -1622,12 +1622,16 @@ checkpoint(&quot;2020-06-08&quot;)
 # check if packages are not installed; if yes, install missing packages
 packages = c(&quot;tidyverse&quot;, &quot;magrittr&quot;, # typical data analysis packages
              &quot;foreach&quot;, &quot;parallel&quot;, # packages used for parallelizing some code chunks
+             &quot;MALDIquant&quot;, # match closest points between two vectors
+             &quot;MASS&quot;, # calculates the generalized inverse matrix
              &quot;R.matlab&quot;)
 newPackages = packages[!(packages %in% installed.packages()[,&quot;Package&quot;])]
 if(length(newPackages) &gt; 0) install.packages(newPackages)
 
 # using the library command to load all packages; invisible used to avoid printing all packages and dependencies used
 invisible(lapply(packages, library, character.only = TRUE))
+
+source(&quot;./Functions.R&quot;) # our custom built functions
 
 set.seed(2020)
 startTime = Sys.time()</code></pre>
@@ -1650,7 +1654,6 @@ startTime = Sys.time()</code></pre>
 <pre class="r"><code># Reading the subject Heights from the Baghdadi et al. (2019) GitHub Repo:
 # ------------------------------------------------------------------------
 subject_heights = read.csv(&quot;https://raw.githubusercontent.com/fmegahed/fatigue-changepoint/master/Data/Raw/DemographicData.csv&quot;) %&gt;%   pull(Height) %&gt;% `*` (0.01) %&gt;%  .[-13] # pull height and convert into meters
-
 
 # Computing gait features based on experimental data from Baghdadi et al. (2019):
 # -------------------------------------------------------------------------------
@@ -1704,12 +1707,12 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <h2><span class="header-section-number">3.1</span> Data Preprocessing</h2>
 <p>In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the <code>videoDataList</code> since these corresponded to the warm-up period of the experiment as detailed in <span class="citation">Maman et al. (2017)</span>, <span class="citation">Baghdadi et al. (2019)</span>, and <span class="citation">Maman et al. (2020)</span>. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span></p>
 <pre class="r"><code>for (i in seq(length(rawSubjectsData))) {
-  videoDataList[[i]] %&lt;&gt;%  
-    na.omit() %&gt;% # removing NA observations
+  videoDataList[[i]] %&lt;&gt;%
+    dplyr::select(Leaves, Enters) %&gt;%
+    apply(MARGIN=2, FUN=na.omit) %&gt;% # removing NA observations
+    as.data.frame %&gt;%
     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %&gt;% # subtracting 600 seconds for warm-up
     filter(Enters &gt; 0 &amp; Leaves &gt; 0) # removing observations/tasks, which contained any of the warm-up period
-  
-  
 }</code></pre>
 </div>
 <div id="rational-subgroups" class="section level2">
@@ -1721,8 +1724,356 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <li>Between group variability can be used to capture the effects of “assignable causes of variability”, which can include disease progression, fatigue, etc.</li>
 </ul>
 <p>For more details on rational subgrouping, we refer the reader to <span class="citation">Montgomery (2019)</span> for more details. The code chunk below provides our approach to creating the rational subgroups for both the “profile” and “gait features” data sets.</p>
-<pre class="r"><code>#</code></pre>
-<p><span style="color: blue;">——————I stopped here——————— </span></p>
+<pre class="r"><code>numRows = lengths(subjectProfilesList)/5
+confidence &lt;- videoDataList %&gt;% lapply(function(x) {mean(x[,2] - x[,1])}) %&gt;%
+  do.call(what=c) %&gt;% `*` (0.05) # 5% confidence for each subgroup
+
+subgroupList &lt;- list()
+for (id in seq(length(rawSubjectsData))) {
+  
+  aM &lt;- subjectProfilesList[[id]] %&gt;% do.call(what=c) %&gt;%
+    .[(numRows[[id]]+1):(2*numRows[id])] %&gt;%
+    lapply(as.vector)
+  
+  expT &lt;- subjectProfilesList[[id]] %&gt;% do.call(what=c) %&gt;%
+    .[(4*numRows[[id]]+1):(5*numRows[id])] %&gt;%
+    lapply(function(x) {x[1,1]}) %&gt;% do.call(what=c)
+  
+  ###########################################################
+  # Match times of walking cycles, extracted from videos, against the experimental times
+  leaveIdx &lt;- match.closest(videoDataList[[id]]$Leaves + confidence[id], expT)
+  enterIdx &lt;- match.closest(videoDataList[[id]]$Enters - confidence[id], expT)
+  
+  rmIdx &lt;- c(3000, which(enter_index - leave_index &lt; 5))
+  leaveIdx &lt;- leaveIdx[-rmIdx]
+  enterIdx &lt;- enterIdx[-rmIdx]
+  
+  ########################################################## Create subgroups
+  aMList &lt;- list()
+  LHDList &lt;- list()
+  for (i in 1:length(leaveIdx)) {
+    aMList[[i]] &lt;- aM[leaveIdx[i]:enterIdx[i]]
+    LHDList[[i]] &lt;- subjectFeaturesList[[id]][leaveIdx[i]:enterIdx[i],]
+  }
+  
+  ######################################### Remove subgroups with length &lt; 20
+  LHDList %&lt;&gt;% .[-{which(lengths(aMList) &lt; 20) %&gt;% c(3000)}]
+  aMList %&lt;&gt;% .[-{which(lengths(aMList) &lt; 20) %&gt;% c(3000)}]
+  
+  ######################################### Remove observations with profiles&lt; 2nd percentile profile length; This is done to cut all profiles at this length (equal number of features)
+  cutLen &lt;- aMList %&gt;% do.call(what=c) %&gt;% lengths() %&gt;% quantile(probs=0.02)
+  for (i in 1:length(aMList)) {
+    rmIdx &lt;- which(lengths(aMList[[i]]) &lt; cutLen) %&gt;% c(3000)
+    aMList[[i]] &lt;- aMList[[i]][-rmIdx]
+    LHDList[[i]] &lt;- LHDList[[i]][-rmIdx,]
+  }
+  
+  ######################################## Create a matrix with cutLen number of columns in each profile subgroup
+  aMList %&lt;&gt;% lapply(function(x) {do.call(rbind, x)}) %&gt;%
+    lapply(function(x) {x[,1:cutLen]})
+  
+  ############################################ Lengths of subgroups 0&amp;1: 10&amp;20
+  subgroupList[[id]] &lt;- list(Acc = list(X0=aMList[1:10], X1=aMList[11:30], X2=aMList[31:length(aMList)]),
+                             LHD = list(X0=LHDList[1:10], X1=LHDList[11:30], X2=LHDList[31:length(LHDList)]))
+}
+names(subgroupList) &lt;- c(paste0(&quot;subject&quot;, c(1:12, 14:15)))</code></pre>
+</div>
+</div>
+<div id="t2-calculations" class="section level1">
+<h1><span class="header-section-number">4</span> <span class="math inline">\(T^2\)</span> Calculations</h1>
+<div id="t2-calculations-on-gait-acceleration-profiles" class="section level2">
+<h2><span class="header-section-number">4.1</span> <span class="math inline">\(T^2\)</span> Calculations on Gait Acceleration Profiles</h2>
+<p>Initialize.</p>
+<pre class="r"><code>T2List &lt;- list()
+for (id in seq(length(subgroupList))) {
+  X0 &lt;- subgroupList[[id]]$Acc$X0
+  
+  ############################# Phase0
+  ############################# Remove single outliers in number of passes
+  pass &lt;- 1
+  for (i in 1:pass) {
+    UCL0 &lt;- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
+    ######################### Find T2 for original X0 and remove outliers from subgroups
+    X0Pooled &lt;- do.call(rbind, X0)
+    T2 &lt;- X0Pooled %&gt;% apply(FUN=mean, MARGIN=2) %&gt;%
+      rep.row(n=nrow(X0Pooled)) %&gt;% -(X0Pooled) %&gt;%
+      apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+    
+    tmp &lt;- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %&gt;% do.call(what=c)
+    OCIdx &lt;- T2 %&gt;% split(f=tmp) %&gt;% lapply(function(x) {c(which(x&gt;UCL0), 3000)})
+    X0 %&lt;&gt;% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
+  }
+  
+  X0Pooled &lt;- do.call(rbind, X0)
+  X0PooledMean &lt;- colMeans(X0Pooled)
+  
+  ############################# Within batch covariance; computed from phase0 after outlier removal
+  S_w &lt;- X0 %&gt;% lapply(colMeans) %&gt;%
+    mapply(FUN=rep.row, sapply(X0, nrow)) %&gt;% # Mean of each subgroup
+    mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %&gt;%
+    lapply(function(x) {t(x) %*% x}) %&gt;%
+    Reduce(f=`+`) %&gt;%
+    `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+  
+  ############################# Phase1&amp;2
+  ############################# Read phase 1&amp;2 subgroups
+  X1 &lt;- subgroupList[[id]]$Acc$X1
+  X2 &lt;- subgroupList[[id]]$Acc$X2
+  
+  ######################### Compute T2 in phase1
+  X1Mean &lt;- sapply(X1, colMeans) %&gt;% t()
+  T2 &lt;- rep.row(X0PooledMean, length(X1)) %&gt;% -(X1Mean) %&gt;%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  ######################### Bootstrap UCL using phase 1 data
+  sampled &lt;- sample(T2, 1000*length(T2), replace=T) %&gt;% matrix(ncol=length(T2), byrow=T)
+  UCL &lt;- apply(sampled, 1, quantile, probs=0.99) %&gt;% mean()
+  
+  ######################### T2 for phase2 data
+  X12Mean &lt;- sapply(c(X1, X2), colMeans) %&gt;% t()
+  T2 &lt;- rep.row(X0PooledMean, length(c(X1, X2))) %&gt;% -(X12Mean) %&gt;%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  T2Profiles[[id]] &lt;- list(T2=T2, UCL=UCL)
+}
+names(T2Profiles) &lt;- paste0(&quot;subject&quot;, c(1:12, 14:15))</code></pre>
+</div>
+<div id="plots-of-t2-on-gait-acceleration-profiles" class="section level2 tabset tabset-fade">
+<h2><span class="header-section-number">4.2</span> Plots of <span class="math inline">\(T^2\)</span> on Gait Acceleration Profiles</h2>
+<p>Initialize.</p>
+<pre class="r"><code>for (id in seq(length(subgroupList))) {
+  T2 &lt;- T2Profiles[[id]]$T2
+  UCL &lt;- T2Profiles[[id]]$UCL
+  color &lt;- ifelse(T2&gt;UCL, &quot;OC&quot;, &quot;IC&quot;)
+  T2.df &lt;- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+                      shape=c(rep(&quot;Phase 1&quot;, 20), rep(&quot;Phase 2&quot;, length(T2) - 20)))
+  
+  T2Plot &lt;- ggplot(data=T2.df) + 
+    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=subgroup, y=T2)) +
+    
+    geom_hline(yintercept=UCL) +
+    annotate(&quot;text&quot;, 2, UCL, vjust=-1, label=&quot;UCL&quot;, size=5) +
+    
+    scale_shape_manual(values = c(6, 16)) +
+    scale_color_manual(values = c(&quot;black&quot;, &quot;red&quot;)) +
+    ggtitle(paste0(&quot;Subject &quot;, id)) +
+    
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .68),
+          legend.text=element_text(size=10),
+          legend.key = element_rect(fill=&quot;grey&quot;))
+  
+  cat(&#39;##&#39;,paste0(&quot;Subject&quot;, id), &quot;{-}&quot;,&#39;\n&#39;)
+  print(list(T2Plot, &quot;&quot;))
+  cat(&#39;\n \n&#39;)
+}</code></pre>
+</div>
+<div id="t2-calculations-on-gait-features" class="section level2">
+<h2><span class="header-section-number">4.3</span> <span class="math inline">\(T^2\)</span> Calculations on Gait Features</h2>
+<p>Initialize.</p>
+<pre class="r"><code>T2Features &lt;- list()
+SWList &lt;- list()
+X0Updated &lt;- list()
+for (id in seq(length(subgroupList))) {
+  X0 &lt;- subgroupList[[id]]$LHD$X0 %&gt;% lapply(function(x) {x=x[,1:3]}) # Last column contains experiment time
+  
+  ############################# Phase0
+  ############################# Remove single outliers in number of passes
+  pass &lt;- 1
+  for (i in 1:pass) {
+    UCL0 &lt;- BootstrapUCL0(x0=X0, alpha=0.05, iterations=200) # Find in Functions
+    ######################### Find T2 for original X0 and remove outliers from subgroups
+    X0Pooled &lt;- do.call(rbind, X0)
+    T2 &lt;- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %&gt;% -(X0Pooled) %&gt;%
+      apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+    
+    tmp &lt;- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %&gt;% do.call(what=c)
+    OCIdx &lt;- T2 %&gt;% split(f=tmp) %&gt;% lapply(function(x) {c(which(x&gt;UCL0), 3000)})
+    X0 %&lt;&gt;% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
+  }
+  X0Pooled &lt;- do.call(rbind, X0)
+  X0PooledMean &lt;- colMeans(X0Pooled)
+  
+  ############################# Within batch covariance; computed from phase0 after outlier removal
+  S_w &lt;- X0 %&gt;% lapply(colMeans) %&gt;%
+    mapply(FUN=rep.row, sapply(X0, nrow)) %&gt;% # Mean of each subgroup
+    mapply(FUN=function(x,y) {x-y}, y=X0, SIMPLIFY=F) %&gt;%
+    lapply(function(x) {t(x) %*% x}) %&gt;%
+    Reduce(f=`+`) %&gt;%
+    `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
+  
+  ############################# Phase1&amp;2
+  ############################# Read phase 1&amp;2 subgroups
+  X1 &lt;- subgroupList[[id]]$LHD$X1 %&gt;% lapply(function(x) {x=x[,1:3]})
+  X2 &lt;- subgroupList[[id]]$LHD$X2 %&gt;% lapply(function(x) {x=x[,1:3]})
+  
+  ######################### Compute T2 in phase1
+  X1Mean &lt;- sapply(X1, colMeans) %&gt;% t()
+  T2 &lt;- rep.row(X0PooledMean, length(X1)) %&gt;% -(X1Mean) %&gt;%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  ######################### Bootstrap UCL using phase 1 data
+  sampled &lt;- sample(T2, 1000*length(T2), replace=T) %&gt;% matrix(ncol=length(T2), byrow=T)
+  UCL &lt;- apply(sampled, 1, quantile, probs=0.99) %&gt;% mean()
+  
+  ######################### T2 for phase2 data
+  X12Mean &lt;- sapply(c(X1, X2), colMeans) %&gt;% t()
+  T2 &lt;- rep.row(X0PooledMean, length(c(X1, X2))) %&gt;% -(X12Mean) %&gt;%
+    apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
+  
+  T2Features[[id]] &lt;- list(T2=T2, UCL=UCL)
+  X0Updated[[id]] &lt;- list(X0=X0)
+  SWList[[id]] &lt;- list(S_w=S_w)
+}
+names(T2Features) &lt;- paste0(&quot;subject&quot;, c(1:12, 14:15))
+names(X0Updated) &lt;- paste0(&quot;subject&quot;, c(1:12, 14:15))
+names(SWList) &lt;- paste0(&quot;subject&quot;, c(1:12, 14:15))</code></pre>
+</div>
+<div id="plots-of-t2-on-gait-features" class="section level2 tabset tabset-fade">
+<h2><span class="header-section-number">4.4</span> Plots of <span class="math inline">\(T^2\)</span> on Gait Features</h2>
+<p>Initialize.</p>
+<pre class="r"><code>for (id in seq(length(subgroupList))) {
+  T2 &lt;- T2Features[[id]]$T2
+  UCL &lt;- T2Features[[id]]$UCL
+  color &lt;- ifelse(T2&gt;UCL, &quot;OC&quot;, &quot;IC&quot;)
+  T2.df &lt;- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+                      shape=c(rep(&quot;Phase 1&quot;, 20), rep(&quot;Phase 2&quot;, length(T2) - 20)))
+  
+  T2Plot &lt;- ggplot(data=T2.df) + 
+    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=subgroup, y=T2)) +
+    
+    geom_hline(yintercept=UCL) +
+    annotate(&quot;text&quot;, 2, UCL, vjust=-1, label=&quot;UCL&quot;, size=5) +
+    
+    scale_shape_manual(values = c(6, 16)) +
+    scale_color_manual(values = c(&quot;black&quot;, &quot;red&quot;)) +
+    ggtitle(paste0(&quot;Subject &quot;, id)) +
+    
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .68),
+          legend.text=element_text(size=10),
+          legend.key = element_rect(fill=&quot;grey&quot;))
+  
+  cat(&#39;##&#39;,paste0(&quot;Subject&quot;, id), &quot;{-}&quot;,&#39;\n&#39;)
+  print(list(T2Plot, &quot;&quot;))
+  cat(&#39;\n \n&#39;)
+}</code></pre>
+</div>
+</div>
+<div id="diagnosis-of-gait-features" class="section level1">
+<h1><span class="header-section-number">5</span> Diagnosis of Gait Features</h1>
+<div id="decomposition-of-features-t2" class="section level2">
+<h2><span class="header-section-number">5.1</span> Decomposition of Features <span class="math inline">\(T^2\)</span></h2>
+<p>Initialize.</p>
+<pre class="r"><code>qList &lt;- list()
+for (id in seq(length(subgroupList))) {
+  ############### Read inputs
+  X0 &lt;- X0Updated[[id]]$X0
+  X1 &lt;- subgroupList[[id]]$LHD$X1 %&gt;% lapply(function(x) {x=x[,1:3]})
+  X2 &lt;- subgroupList[[id]]$LHD$X2 %&gt;% lapply(function(x) {x=x[,1:3]})
+  X0PooledMean &lt;- do.call(rbind, X0) %&gt;% colMeans()
+  X1Mean &lt;- sapply(X1, colMeans) %&gt;% t()
+  X12Mean &lt;- sapply(c(X1, X2), colMeans) %&gt;% t()
+  S_w &lt;- SWList[[id]]$S_w
+  
+  T2 &lt;- T2Features[[id]]$T2
+  UCL &lt;- T2Features[[id]]$UCL
+  t3 &lt;- which(T2 &gt; UCL)
+  p &lt;- 3 # number of features
+  alpha &lt;- 0.01
+  
+  ############## T2 Decomposition and UCL&#39;s
+  q &lt;- init.decomp(p=p) # initialize the decomposition matrix
+  for(i in 1:nrow(q)) {# Control limits for each component of the decomposition
+    b &lt;- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] &gt; 0)
+    
+    T2 &lt;- rep.row(X0PooledMean[b], length(X1)) %&gt;% -(X1Mean[,b]) %&gt;%
+      apply(MARGIN=1, function(x) x %*% solve(S_w[b,b]) %*% x)
+    
+    sampled &lt;- matrix(sample(T2, 1000 * length(T2), replace=T), ncol=20, byrow=T)
+    q[i,2] &lt;- apply(sampled, 1, quantile, probs=1-alpha) %&gt;% mean()
+  }
+  
+  ############## Decompose T2 for every out of control data point
+  tmpList &lt;- list()
+  for(ii in 1:length(t3)){
+    for(i in 1:nrow(q)) {
+      b &lt;- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] &gt; 0)
+      q[i,1] &lt;- t(X0PooledMean[b]-X12Mean[t3[ii],][b]) %*%
+        solve(S_w[b,b]) %*%
+        (X0PooledMean[b]-X12Mean[t3[ii],][b])
+    }
+    ############ Store decomposed elements
+    tmpList[[ii]] &lt;- q
+  }
+  names(tmpList) &lt;- paste0(&quot;subgroup &quot;, t3)
+  qList[[id]] &lt;- tmpList
+}
+names(qList) &lt;- paste0(&quot;subject&quot;, c(1:12, 14:15))</code></pre>
+</div>
+<div id="d-ellipse-plots" class="section level2">
+<h2><span class="header-section-number">5.2</span> 2D Ellipse plots</h2>
+<p>Initialize.</p>
+<pre class="r"><code>################ Select subject number and features
+id &lt;- 1 # Select the subject number
+f &lt;- c(2,3) # Select 2 features by interpreting the T2 decomposition
+
+################ Read inputs
+X0 &lt;- X0Updated[[id]]$X0
+X1 &lt;- subgroupList[[id]]$LHD$X1 %&gt;% lapply(function(x) {x=x[,1:3]})
+X2 &lt;- subgroupList[[id]]$LHD$X2 %&gt;% lapply(function(x) {x=x[,1:3]})
+X0PooledMean &lt;- do.call(rbind, X0) %&gt;% colMeans()
+S_w &lt;- SWList[[id]]$S_w
+q &lt;- qList[[id]][[1]] # Read one of the q&#39;s as its 2nd column (q[,2]) are the control limits and thus the same across all subgroups in one subject
+T2 &lt;- T2Features[[id]]$T2
+UCL &lt;- T2Features[[id]]$UCL
+
+################ Univariate CL&#39;s and 2D plot limits
+XLim &lt;- c(X0PooledMean[f[1]]-sqrt(S_w[f[1],f[1]]*q[f[1],2]),
+          X0PooledMean[f[1]]+sqrt(S_w[f[1],f[1]]*q[f[1],2]))
+
+YLim &lt;- c(X0PooledMean[f[2]]-sqrt(S_w[f[2],f[2]]*q[f[2],2]),
+          X0PooledMean[f[2]]+sqrt(S_w[f[2],f[2]]*q[f[2],2]))
+
+xlim &lt;- c(min(XLim) - 1.2*diff(XLim), max(XLim) + 1.2*diff(XLim))
+ylim &lt;- c(min(YLim) - 1.2*diff(YLim), max(YLim) + 1.2*diff(YLim))
+
+################ Create grid for the ellipse contour plot
+ngrid &lt;- 100
+grid &lt;- cbind(seq(xlim[1], xlim[2], length = ngrid),
+              seq(ylim[1], ylim[2], length = ngrid))
+
+################  T2 on the grid points
+T2_grid &lt;- apply(expand.grid(grid[,1], grid[,2]), 1,
+                 function(x) {(x- X0PooledMean[f]) %*% solve(S_w[f,f]) %*% (x- X0PooledMean[f])})
+T2_grid &lt;- matrix(T2_grid, ngrid, ngrid)
+
+################ Plot the contour
+plot(1 ,1, type = &quot;o&quot;, xlim = xlim, ylim = ylim)
+idx &lt;- apply(q[,3:5], MARGIN=1, function(r) all(c(f,0) %in% r)) %&gt;% which()
+contour(grid[,1], grid[,2], T2_grid, levels=q[idx,2], drawlabels=T, add=T)
+
+################ Plot phase0 data
+center0 &lt;- X0 %&gt;% lapply(function(x) {x[,f]}) %&gt;% sapply(colMeans) %&gt;% t()
+points(center0[,1], center0[,2], pch=3, cex=2, col=&quot;blue&quot;, lwd=2)
+points(X0Pooled[,f], pch=1, cex=0.5, col=&quot;blue&quot;)
+
+################ plot phase 1 and 2 data by subgroup number
+center12 &lt;- c(X1,X2) %&gt;% lapply(colMeans) %&gt;% sapply(function(x) {x[f]}) %&gt;% t()
+labels &lt;- T2 %&gt;% t() %&gt;% as.data.frame() %&gt;% names() %&gt;% gsub(pattern=&#39;V&#39;, replacement=&#39;&#39;)
+text(center12, labels=labels, cex = 1, col=ifelse(T2&gt;UCL, &quot;red&quot;, &quot;black&quot;))
+
+################ Plot univariate CL&#39;s
+abline(v=XLim, h=YLim, lty=3)</code></pre>
 <hr />
 </div>
 </div>
@@ -1746,11 +2097,11 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, &quot;Subject[:digit:
 <div class="footnotes">
 <hr />
 <ol>
-<li id="fn1"><p>Email: <a href="mailto:saebraga@buffalo.edu" class="email">saebraga@buffalo.edu</a> | Website: <a href="https://www.linkedin.com/in/saeb-ragani-lamooki-123a9658/">LinkedIn</a><a href="#fnref1" class="footnote-back">↩</a></p></li>
-<li id="fn2"><p>Email: <a href="mailto:jiyeonk@buffalo.edu" class="email">jiyeonk@buffalo.edu</a> | Phone: +1-716-645-6063 | Website: <a href="http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/j-jang.html">University at Buffalo Official</a><a href="#fnref2" class="footnote-back">↩</a></p></li>
-<li id="fn3"><p>Email: <a href="mailto:loracavu@buffalo.edu" class="email">loracavu@buffalo.edu</a> | Phone: +1-716-645-4696 | Website: <a href="http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/cavuoto-lora.html">University at Buffalo Official</a><a href="#fnref3" class="footnote-back">↩</a></p></li>
-<li id="fn4"><p>Email: <a href="mailto:fmegahed@miamioh.edu" class="email">fmegahed@miamioh.edu</a> | Phone: +1-513-529-4185 | Website: <a href="https://miamioh.edu/fsb/directory/?up=/directory/megahefm">Miami University Official</a><a href="#fnref4" class="footnote-back">↩</a></p></li>
-<li id="fn5"><p>Email: <a href="mailto:farmerl2@miamioh.edu" class="email">farmerl2@miamioh.edu</a> | Phone: +1-513-529-4823 | Website: <a href="https://miamioh.edu/fsb/directory/?up=/directory/farmerl2">Miami University Official</a><a href="#fnref5" class="footnote-back">↩</a></p></li>
+<li id="fn1"><p>Email: <a href="mailto:saebraga@buffalo.edu" class="email">saebraga@buffalo.edu</a> | Website: <a href="https://www.linkedin.com/in/saeb-ragani-lamooki-123a9658/">LinkedIn</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>Email: <a href="mailto:jiyeonk@buffalo.edu" class="email">jiyeonk@buffalo.edu</a> | Phone: +1-716-645-6063 | Website: <a href="http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/j-jang.html">University at Buffalo Official</a><a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn3"><p>Email: <a href="mailto:loracavu@buffalo.edu" class="email">loracavu@buffalo.edu</a> | Phone: +1-716-645-4696 | Website: <a href="http://engineering.buffalo.edu/industrial-systems/people/faculty-directory/cavuoto-lora.html">University at Buffalo Official</a><a href="#fnref3" class="footnote-back">↩︎</a></p></li>
+<li id="fn4"><p>Email: <a href="mailto:fmegahed@miamioh.edu" class="email">fmegahed@miamioh.edu</a> | Phone: +1-513-529-4185 | Website: <a href="https://miamioh.edu/fsb/directory/?up=/directory/megahefm">Miami University Official</a><a href="#fnref4" class="footnote-back">↩︎</a></p></li>
+<li id="fn5"><p>Email: <a href="mailto:farmerl2@miamioh.edu" class="email">farmerl2@miamioh.edu</a> | Phone: +1-513-529-4823 | Website: <a href="https://miamioh.edu/fsb/directory/?up=/directory/farmerl2">Miami University Official</a><a href="#fnref5" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
 
