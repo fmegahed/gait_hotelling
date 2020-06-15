@@ -139,6 +139,17 @@ names(subjectProfilesList) = sapply(profileFiles, str_extract_all, "Subject[:dig
 videoFiles = list.files(path = "../Data/csvFiles/", pattern = "*.csv", full.names = TRUE) 
 videoDataList = lapply(videoFiles, read.csv)
 names(videoDataList) = sapply(videoFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
+
+# 
+for (i in seq(length(rawSubjectsData))) {
+  videoDataList[[i]] %<>%
+    dplyr::select(Leaves, Enters) %>%
+    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+    as.data.frame %>%
+    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+}
+
 ```
 
 ---
@@ -149,14 +160,19 @@ names(videoDataList) = sapply(videoFiles, str_extract_all, "Subject[:digit:]*", 
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
 ```{r dataCleaning}
 
-for (i in seq(length(rawSubjectsData))) {
-  videoDataList[[i]] %<>%
-    dplyr::select(Leaves, Enters) %>%
-    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
-    as.data.frame %>%
-    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
-    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-}
+#############################################################
+# Moved to previous chuck since if previous runs but this one does not videoDataList shirnks
+#############################################################
+
+
+# for (i in seq(length(rawSubjectsData))) {
+#   videoDataList[[i]] %<>%
+#     dplyr::select(Leaves, Enters) %>%
+#     apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+#     as.data.frame %>%
+#     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+#     filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+# }
 
 ```
 
@@ -169,7 +185,7 @@ Given the nature of the experimental study, the subjects performed varying tasks
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
-```{r subgroups, eval=FALSE}
+```{r subgroups, warning=FALSE}
 numRows = lengths(subjectProfilesList)/5
 confidence <- videoDataList %>% lapply(function(x) {mean(x[,2] - x[,1])}) %>%
   do.call(what=c) %>% `*` (0.05) # 5% confidence for each subgroup
@@ -190,7 +206,7 @@ for (id in seq(length(rawSubjectsData))) {
   leaveIdx <- match.closest(videoDataList[[id]]$Leaves + confidence[id], expT)
   enterIdx <- match.closest(videoDataList[[id]]$Enters - confidence[id], expT)
   
-  rmIdx <- c(3000, which(enter_index - leave_index < 5))
+  rmIdx <- c(3000, which(enterIdx - leaveIdx < 5))
   leaveIdx <- leaveIdx[-rmIdx]
   enterIdx <- enterIdx[-rmIdx]
   
@@ -234,8 +250,8 @@ names(subgroupList) <- c(paste0("subject", c(1:12, 14:15)))
 Initialize.
 
 
-```{r T2Profiles, eval=FALSE}
-T2List <- list()
+```{r T2Profiles}
+T2Profiles <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$Acc$X0
   
@@ -293,7 +309,7 @@ names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 
 Initialize.
 
-```{r T2ProfilesPlot, eval=FALSE, fig.align='center', results='asis', out.width="100%"}
+```{r T2ProfilesPlot, fig.align='center', results='asis', out.width="100%"}
 
 for (id in seq(length(subgroupList))) {
   T2 <- T2Profiles[[id]]$T2
@@ -322,8 +338,8 @@ for (id in seq(length(subgroupList))) {
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"))
   
-  cat('##',paste0("Subject", id), "{-}",'\n')
-  print(list(T2Plot, ""))
+  cat('###',paste0("Subject", id), "{-}",'\n')
+  print(T2Plot)
   cat('\n \n')
 }
 ```
@@ -334,7 +350,7 @@ for (id in seq(length(subgroupList))) {
 Initialize.
 
 
-```{r T2Features, eval=FALSE}
+```{r T2Features}
 T2Features <- list()
 SWList <- list()
 X0Updated <- list()
@@ -398,7 +414,7 @@ names(SWList) <- paste0("subject", c(1:12, 14:15))
 
 Initialize.
 
-```{r T2FeaturesPlot, eval=FALSE, fig.align='center', results='asis', out.width="100%"}
+```{r T2FeaturesPlot, fig.align='center', results='asis', out.width="100%"}
 
 for (id in seq(length(subgroupList))) {
   T2 <- T2Features[[id]]$T2
@@ -427,8 +443,8 @@ for (id in seq(length(subgroupList))) {
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"))
   
-  cat('##',paste0("Subject", id), "{-}",'\n')
-  print(list(T2Plot, ""))
+  cat('###',paste0("Subject", id), "{-}",'\n')
+  print(T2Plot)
   cat('\n \n')
 }
 ```
@@ -440,7 +456,7 @@ for (id in seq(length(subgroupList))) {
 Initialize.
 
 
-```{r T2Decompose, eval=FALSE}
+```{r T2Decompose}
 
 qList <- list()
 for (id in seq(length(subgroupList))) {
@@ -495,8 +511,7 @@ names(qList) <- paste0("subject", c(1:12, 14:15))
 Initialize.
 
 
-```{r T2Ellipse, eval=FALSE}
-
+```{r Ellipsechart}
 ################ Select subject number and features
 id <- 1 # Select the subject number
 f <- c(2,3) # Select 2 features by interpreting the T2 decomposition
@@ -505,7 +520,9 @@ f <- c(2,3) # Select 2 features by interpreting the T2 decomposition
 X0 <- X0Updated[[id]]$X0
 X1 <- subgroupList[[id]]$LHD$X1 %>% lapply(function(x) {x=x[,1:3]})
 X2 <- subgroupList[[id]]$LHD$X2 %>% lapply(function(x) {x=x[,1:3]})
+X0Pooled <- do.call(rbind, X0)
 X0PooledMean <- do.call(rbind, X0) %>% colMeans()
+X1Pooled <- do.call(rbind, X1)
 S_w <- SWList[[id]]$S_w
 q <- qList[[id]][[1]] # Read one of the q's as its 2nd column (q[,2]) are the control limits and thus the same across all subgroups in one subject
 T2 <- T2Features[[id]]$T2
@@ -531,24 +548,43 @@ T2_grid <- apply(expand.grid(grid[,1], grid[,2]), 1,
                  function(x) {(x- X0PooledMean[f]) %*% solve(S_w[f,f]) %*% (x- X0PooledMean[f])})
 T2_grid <- matrix(T2_grid, ngrid, ngrid)
 
-################ Plot the contour
-plot(1 ,1, type = "o", xlim = xlim, ylim = ylim)
+######################################################## Plot
+############## Plot the contour
+# old.par <- par()
+par(mar=c(5, 5, 4, 2) + 0.1)
+
+plot(1 ,1, type = "o", xlim = xlim, ylim = ylim, main="Ellipse Chart", cex.main=1.5,
+     xlab=paste0(colnames(X0[[1]])[f[1]], " (m)"),
+     ylab=paste0(ylab=colnames(X0[[1]])[f[2]], " (s)"),
+     cex.axis=1.5, cex.lab=1.5)
+
+legend("topleft", legend=c("phase 0 subgroup means", "phase 1 subgroup means",
+                           "X control limits", "Y control limits"),
+       col=c("green", "blue", "black", "brown"), pch=c(3,3,NA,NA), lty=c(NA,NA,2,2),
+       cex=1, pt.cex=2, lwd=2, bg="grey")
+################
 idx <- apply(q[,3:5], MARGIN=1, function(r) all(c(f,0) %in% r)) %>% which()
 contour(grid[,1], grid[,2], T2_grid, levels=q[idx,2], drawlabels=T, add=T)
 
-################ Plot phase0 data
+################ Plot phase 0 data
 center0 <- X0 %>% lapply(function(x) {x[,f]}) %>% sapply(colMeans) %>% t()
-points(center0[,1], center0[,2], pch=3, cex=2, col="blue", lwd=2)
-points(X0Pooled[,f], pch=1, cex=0.5, col="blue")
+points(center0[,1], center0[,2], pch=3, cex=2, col="green", lwd=2)
+# points(X0Pooled[,f], pch=1, cex=0.5, col="blue")
 
-################ plot phase 1 and 2 data by subgroup number
+################ Plot phase 1 data
+center1 <- X1 %>% lapply(function(x) {x[,f]}) %>% sapply(colMeans) %>% t()
+points(center1[,1], center1[,2], pch=3, cex=2, col="blue", lwd=2)
+# points(X1Pooled[,f], pch=1, cex=0.5, col="blue")
+
+################ plot phase 1&2 data by subgroup number
 center12 <- c(X1,X2) %>% lapply(colMeans) %>% sapply(function(x) {x[f]}) %>% t()
 labels <- T2 %>% t() %>% as.data.frame() %>% names() %>% gsub(pattern='V', replacement='')
 text(center12, labels=labels, cex = 1, col=ifelse(T2>UCL, "red", "black"))
 
 ################ Plot univariate CL's
-abline(v=XLim, h=YLim, lty=3)
 
+abline(v=XLim, lty="dashed", col="black", lwd=2)
+abline(h=YLim, lty="dashed", col="brown", lwd=2)
 ```
 
 
