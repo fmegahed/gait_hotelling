@@ -147,25 +147,26 @@ names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*",
 
 ## Data Preprocessing
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
-```{r dataCleaning, dependson=-1}
 
-for (i in seq(length(rawSubjectsData))) {
-  videoDataList[[i]] %<>%
-    dplyr::select(Leaves, Enters) %>%
-    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
-    as.data.frame %>%
-    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
-    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-}
+```{r dataCleaning}
+
+# for (i in seq(length(rawSubjectsData))) {
+#   videoDataList[[i]] %<>%
+#     dplyr::select(Leaves, Enters) %>%
+#     apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+#     as.data.frame %>%
+#     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+#     filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+# }
 
 ```
 
 
 ## Rational Subgroups
-Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:    
+Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:
 
-  - Minimize the variability within a subgroup such that the witin-group variability captures the natural variability in the gait cycles.   
-  - Between group variability can be used to capture the effects of "assignable causes of variability", which can include disease progression, fatigue, etc.     
+  - Minimize the variability within a subgroup such that the witin-group variability captures the natural variability in the gait cycles.
+  - Between group variability can be used to capture the effects of "assignable causes of variability", which can include disease progression, fatigue, etc.
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
@@ -176,24 +177,24 @@ confidence <- videoDataList %>% lapply(function(x) {mean(x[,2] - x[,1])}) %>%
 
 subgroupList <- list()
 for (id in seq(length(rawSubjectsData))) {
-  
+
   aM <- subjectProfilesList[[id]] %>% do.call(what=c) %>%
     .[(numRows[[id]]+1):(2*numRows[id])] %>%
     lapply(as.vector)
-  
+
   expT <- subjectProfilesList[[id]] %>% do.call(what=c) %>%
     .[(4*numRows[[id]]+1):(5*numRows[id])] %>%
     lapply(function(x) {x[1,1]}) %>% do.call(what=c)
-  
+
   ###########################################################
   # Match times of walking cycles, extracted from videos, against the experimental times
   leaveIdx <- match.closest(videoDataList[[id]]$Leaves + confidence[id], expT)
   enterIdx <- match.closest(videoDataList[[id]]$Enters - confidence[id], expT)
-  
+
   rmIdx <- c(3000, which(enterIdx - leaveIdx < 5))
   leaveIdx <- leaveIdx[-rmIdx]
   enterIdx <- enterIdx[-rmIdx]
-  
+
   ########################################################## Create subgroups
   aMList <- list()
   LHDList <- list()
@@ -201,11 +202,11 @@ for (id in seq(length(rawSubjectsData))) {
     aMList[[i]] <- aM[leaveIdx[i]:enterIdx[i]]
     LHDList[[i]] <- subjectFeaturesList[[id]][leaveIdx[i]:enterIdx[i],]
   }
-  
+
   ######################################### Remove subgroups with length < 20
   LHDList %<>% .[-{which(lengths(aMList) < 20) %>% c(3000)}]
   aMList %<>% .[-{which(lengths(aMList) < 20) %>% c(3000)}]
-  
+
   ######################################### Remove observations with profiles< 2nd percentile profile length; This is done to cut all profiles at this length (equal number of features)
   cutLen <- aMList %>% do.call(what=c) %>% lengths() %>% quantile(probs=0.02)
   for (i in 1:length(aMList)) {
@@ -213,11 +214,11 @@ for (id in seq(length(rawSubjectsData))) {
     aMList[[i]] <- aMList[[i]][-rmIdx]
     LHDList[[i]] <- LHDList[[i]][-rmIdx,]
   }
-  
+
   ######################################## Create a matrix with cutLen number of columns in each profile subgroup
   aMList %<>% lapply(function(x) {do.call(rbind, x)}) %>%
     lapply(function(x) {x[,1:cutLen]})
-  
+
   ############################################ Lengths of subgroups 0&1: 10&20
   subgroupList[[id]] <- list(Acc = list(X0=aMList[1:10], X1=aMList[11:30], X2=aMList[31:length(aMList)]),
                              LHD = list(X0=LHDList[1:10], X1=LHDList[11:30], X2=LHDList[31:length(LHDList)]))
@@ -238,7 +239,7 @@ Initialize.
 T2Profiles <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$Acc$X0
-  
+
   ############################# Phase0
   ############################# Remove single outliers in number of passes
   pass <- 1
@@ -249,15 +250,15 @@ for (id in seq(length(subgroupList))) {
     T2 <- X0Pooled %>% apply(FUN=mean, MARGIN=2) %>%
       rep.row(n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
       apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
-    
+
     tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
     OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
     X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
   }
-  
+
   X0Pooled <- do.call(rbind, X0)
   X0PooledMean <- colMeans(X0Pooled)
-  
+
   ############################# Within batch covariance; computed from phase0 after outlier removal
   S_w <- X0 %>% lapply(colMeans) %>%
     mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
@@ -265,21 +266,21 @@ for (id in seq(length(subgroupList))) {
     lapply(function(x) {t(x) %*% x}) %>%
     Reduce(f=`+`) %>%
     `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
-  
+
   ############################# Phase1&2
   ############################# Read phase 1&2 subgroups
   X1 <- subgroupList[[id]]$Acc$X1
   X2 <- subgroupList[[id]]$Acc$X2
-  
+
   ######################### Compute T2 in phase1
   X1Mean <- sapply(X1, colMeans) %>% t()
   T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  
+
   ######################### Bootstrap UCL using phase 1 data
   sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
   UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
-  
+
   ######################### T2 for phase2 data
   X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
@@ -301,18 +302,18 @@ for (id in seq(length(subgroupList))) {
   color <- ifelse(T2>UCL, "OC", "IC")
   T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
                       shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
-  
-  T2Plot <- ggplot(data=T2.df) + 
+
+  T2Plot <- ggplot(data=T2.df) +
     geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
     geom_line(aes(x=subgroup, y=T2)) +
-    
+
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
-    
+
     scale_shape_manual(values = c(6, 16)) +
     scale_color_manual(values = c("black", "red")) +
     ggtitle(paste0("Subject ", id)) +
-    
+
     theme_bw() +
     theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
           axis.text=element_text(size=15),
@@ -321,7 +322,7 @@ for (id in seq(length(subgroupList))) {
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"))
-  
+
   cat('###',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
@@ -346,7 +347,7 @@ for (id in seq(length(SubgroupTimeList))) {
   OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
   RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
     sapply(function(x) {RPE[x,1]})
-  
+
   cat('###',paste0("Subject", id), "{-}",'\n')
   plot(OCTime, rep(1, length(OCTime)), pch=16, xlim=c(0,11000), xlab="Experiment Time",
        ylab="", main=paste0("Subject", id))
@@ -371,7 +372,7 @@ SWList <- list()
 X0Updated <- list()
 for (id in seq(length(subgroupList))) {
   X0 <- subgroupList[[id]]$LHD$X0 %>% lapply(function(x) {x=x[,1:3]}) # Last column contains experiment time
-  
+
   ############################# Phase0
   ############################# Remove single outliers in number of passes
   pass <- 1
@@ -381,14 +382,14 @@ for (id in seq(length(subgroupList))) {
     X0Pooled <- do.call(rbind, X0)
     T2 <- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
       apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
-    
+
     tmp <- mapply(function(x,y) {rep(y, x)}, x=sapply(X0, nrow), y=1:10) %>% do.call(what=c)
     OCIdx <- T2 %>% split(f=tmp) %>% lapply(function(x) {c(which(x>UCL0), 3000)})
     X0 %<>% mapply(FUN=function(x, y) {x[-y,]}, y=OCIdx) # Updated X0 after phase0
   }
   X0Pooled <- do.call(rbind, X0)
   X0PooledMean <- colMeans(X0Pooled)
-  
+
   ############################# Within batch covariance; computed from phase0 after outlier removal
   S_w <- X0 %>% lapply(colMeans) %>%
     mapply(FUN=rep.row, sapply(X0, nrow)) %>% # Mean of each subgroup
@@ -396,26 +397,26 @@ for (id in seq(length(subgroupList))) {
     lapply(function(x) {t(x) %*% x}) %>%
     Reduce(f=`+`) %>%
     `/` (sum(lengths(X0)/ncol(X0[[1]])) - length(X0))
-  
+
   ############################# Phase1&2
   ############################# Read phase 1&2 subgroups
   X1 <- subgroupList[[id]]$LHD$X1 %>% lapply(function(x) {x=x[,1:3]})
   X2 <- subgroupList[[id]]$LHD$X2 %>% lapply(function(x) {x=x[,1:3]})
-  
+
   ######################### Compute T2 in phase1
   X1Mean <- sapply(X1, colMeans) %>% t()
   T2 <- rep.row(X0PooledMean, length(X1)) %>% -(X1Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  
+
   ######################### Bootstrap UCL using phase 1 data
   sampled <- sample(T2, 1000*length(T2), replace=T) %>% matrix(ncol=length(T2), byrow=T)
   UCL <- apply(sampled, 1, quantile, probs=0.99) %>% mean()
-  
+
   ######################### T2 for phase2 data
   X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  
+
   T2Features[[id]] <- list(T2=T2, UCL=UCL)
   X0Updated[[id]] <- list(X0=X0)
   SWList[[id]] <- list(S_w=S_w)
@@ -437,18 +438,18 @@ for (id in seq(length(subgroupList))) {
   color <- ifelse(T2>UCL, "OC", "IC")
   T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
                       shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
-  
-  T2Plot <- ggplot(data=T2.df) + 
+
+  T2Plot <- ggplot(data=T2.df) +
     geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
     geom_line(aes(x=subgroup, y=T2)) +
-    
+
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
-    
+
     scale_shape_manual(values = c(6, 16)) +
     scale_color_manual(values = c("black", "red")) +
     ggtitle(paste0("Subject ", id)) +
-    
+
     theme_bw() +
     theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
           axis.text=element_text(size=15),
@@ -457,7 +458,7 @@ for (id in seq(length(subgroupList))) {
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"))
-  
+
   cat('###',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
@@ -482,7 +483,7 @@ for (id in seq(length(SubgroupTimeList))) {
   OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
   RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
     sapply(function(x) {RPE[x,1]})
-  
+
   cat('###',paste0("Subject", id), "{-}",'\n')
   plot(OCTime, rep(1, length(OCTime)), pch=16, xlim=c(0,11000), xlab="Experiment Time",
        ylab="", main=paste0("Subject", id))
@@ -514,25 +515,25 @@ for (id in seq(length(subgroupList))) {
   X1Mean <- sapply(X1, colMeans) %>% t()
   X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
   S_w <- SWList[[id]]$S_w
-  
+
   T2 <- T2Features[[id]]$T2
   UCL <- T2Features[[id]]$UCL
   t3 <- which(T2 > UCL)
   p <- 3 # number of features
   alpha <- 0.01
-  
+
   ############## T2 Decomposition and UCL's
   q <- init.decomp(p=p) # initialize the decomposition matrix
   for(i in 1:nrow(q)) {# Control limits for each component of the decomposition
     b <- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] > 0)
-    
+
     T2 <- rep.row(X0PooledMean[b], length(X1)) %>% -(X1Mean[,b]) %>%
       apply(MARGIN=1, function(x) x %*% solve(S_w[b,b]) %*% x)
-    
+
     sampled <- matrix(sample(T2, 1000 * length(T2), replace=T), ncol=20, byrow=T)
     q[i,2] <- apply(sampled, 1, quantile, probs=1-alpha) %>% mean()
   }
-  
+
   ############## Decompose T2 for every out of control data point
   tmpList <- list()
   for(ii in 1:length(t3)){
