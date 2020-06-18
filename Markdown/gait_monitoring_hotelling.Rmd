@@ -73,7 +73,7 @@ invisible(lapply(packages, library, character.only = TRUE))
 source("./Functions.R") # our custom built functions
 
 set.seed(2020)
-startTime = Sys.time()
+startTime <- Sys.time()
 ```
 
 
@@ -93,62 +93,52 @@ The code chunk below provides our code for reading the three different datasets.
 ```{r read}
 # Reading the subject Heights from the Baghdadi et al. (2019) GitHub Repo:
 # ------------------------------------------------------------------------
-subject_heights = read.csv("https://raw.githubusercontent.com/fmegahed/fatigue-changepoint/master/Data/Raw/DemographicData.csv") %>%   pull(Height) %>% `*` (0.01) %>%  .[-13] # pull height and convert into meters
+subject_heights <- read.csv("https://raw.githubusercontent.com/fmegahed/fatigue-changepoint/master/Data/Raw/DemographicData.csv") %>%   pull(Height) %>% `*` (0.01) %>%  .[-13] # pull height and convert into meters
 
 # Computing gait features based on experimental data from Baghdadi et al. (2019):
 # -------------------------------------------------------------------------------
-featureFiles = list.files(path = "../Data/matFiles/Features/", pattern = "*.mat", full.names = TRUE)
-rawSubjectsData = lapply(featureFiles, readMat) %>% # read all mat files in Feature List
+featureFiles <- list.files(path = "../Data/matFiles/Features/", pattern = "*.mat", full.names = TRUE)
+rawSubjectsData <- lapply(featureFiles, readMat) %>% # read all mat files in Feature List
   lapply("[[", "M.i.k") # extract sublist titled "M.i.k" from all the lists
-names(rawSubjectsData) = str_extract_all(featureFiles, "Subject[:digit:]*", simplify = TRUE)
+names(rawSubjectsData) <- str_extract_all(featureFiles, "Subject[:digit:]*", simplify = TRUE)
 
-numRows = lengths(rawSubjectsData)/17 # number of observations per Subject
+numRows <- lengths(rawSubjectsData)/17 # number of observations per Subject
 
-subjectFeaturesList = vector(mode = "list", length = length(rawSubjectsData)) # initialize list
-names(subjectFeaturesList) = names(rawSubjectsData)
+subjectFeaturesList <- vector(mode = "list", length = length(rawSubjectsData)) # initialize list
+names(subjectFeaturesList) <- names(rawSubjectsData)
 
 for (i in seq(length(rawSubjectsData))) {
-  gaitLength =  rawSubjectsData[[i]][ 1:numRows[i] ] %>% 
+  gaitLength <-  rawSubjectsData[[i]][ 1:numRows[i] ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist() %>% 
     `/` (subject_heights[i])
   
-  gaitHeight = rawSubjectsData[[i]][ (1+numRows[i]):(2*numRows[i]) ] %>% 
+  gaitHeight <- rawSubjectsData[[i]][ (1+numRows[i]):(2*numRows[i]) ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist() %>% 
     `/` (subject_heights[i])
   
-  gaitDuration = rawSubjectsData[[i]][ (1+ 2*numRows[i]):(3*numRows[i]) ] %>% 
+  gaitDuration <- rawSubjectsData[[i]][ (1+ 2*numRows[i]):(3*numRows[i]) ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist(recursive = TRUE)
   
-  expTime = rawSubjectsData[[i]][ (1+ 16*numRows[i]):(17*numRows[i]) ] %>% 
+  expTime <- rawSubjectsData[[i]][ (1+ 16*numRows[i]):(17*numRows[i]) ] %>% 
     lapply(unlist) %>% lapply(min) %>% unlist()
   
-  subjectFeaturesList[[i]] = cbind(gaitLength, gaitHeight, gaitDuration, expTime)
+  subjectFeaturesList[[i]] <- cbind(gaitLength, gaitHeight, gaitDuration, expTime)
 }
 
 
 # Reading the segmented gait cycles for each participant:
 # -------------------------------------------------------
-profileFiles = list.files(path = "../Data/matFiles/Profiles/", pattern = "*.mat", full.names = TRUE) 
-subjectProfilesList = lapply(profileFiles, readMat) %>% # read all mat files from the path above
+profileFiles <- list.files(path = "../Data/matFiles/Profiles/", pattern = "*.mat", full.names = TRUE) 
+subjectProfilesList <- lapply(profileFiles, readMat) %>% # read all mat files from the path above
   lapply("[[", "gait") # extract sublist titled "gait" from all the lists
-names(subjectProfilesList) = sapply(profileFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
+names(subjectProfilesList) <- sapply(profileFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
 
 
 # Reading task-related based on the tagging of the experimental videos:
 # ---------------------------------------------------------------------
-videoFiles = list.files(path = "../Data/csvFiles/", pattern = "*.csv", full.names = TRUE) 
-videoDataList = lapply(videoFiles, read.csv)
-names(videoDataList) = sapply(videoFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
-
-# 
-for (i in seq(length(rawSubjectsData))) {
-  videoDataList[[i]] %<>%
-    dplyr::select(Leaves, Enters) %>%
-    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
-    as.data.frame %>%
-    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
-    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-}
+videoFiles <- list.files(path = "../Data/csvFiles/", pattern = "*.csv", full.names = TRUE) 
+videoDataList <- lapply(videoFiles, read.csv)
+names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
 
 ```
 
@@ -164,15 +154,14 @@ In Section 2, we have read four different data sets and extracted the three gait
 # Moved to previous chuck since if previous runs but this one does not videoDataList shirnks
 #############################################################
 
-
-# for (i in seq(length(rawSubjectsData))) {
-#   videoDataList[[i]] %<>%
-#     dplyr::select(Leaves, Enters) %>%
-#     apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
-#     as.data.frame %>%
-#     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
-#     filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-# }
+for (i in seq(length(rawSubjectsData))) {
+  videoDataList[[i]] %<>%
+    dplyr::select(Leaves, Enters) %>%
+    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+    as.data.frame %>%
+    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+}
 
 ```
 
@@ -186,7 +175,7 @@ Given the nature of the experimental study, the subjects performed varying tasks
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
 
 ```{r subgroups, warning=FALSE}
-numRows = lengths(subjectProfilesList)/5
+numRows <- lengths(subjectProfilesList)/5
 confidence <- videoDataList %>% lapply(function(x) {mean(x[,2] - x[,1])}) %>%
   do.call(what=c) %>% `*` (0.05) # 5% confidence for each subgroup
 
