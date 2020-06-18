@@ -133,7 +133,6 @@ subjectProfilesList <- lapply(profileFiles, readMat) %>% # read all mat files fr
   lapply("[[", "gait") # extract sublist titled "gait" from all the lists
 names(subjectProfilesList) <- sapply(profileFiles, str_extract_all, "Subject[:digit:]*", simplify = TRUE)
 
-
 # Reading task-related based on the tagging of the experimental videos:
 # ---------------------------------------------------------------------
 videoFiles <- list.files(path = "../Data/csvFiles/", pattern = "*.csv", full.names = TRUE) 
@@ -148,11 +147,7 @@ names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*",
 
 ## Data Preprocessing
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
-```{r dataCleaning}
-
-#############################################################
-# Moved to previous chuck since if previous runs but this one does not videoDataList shirnks
-#############################################################
+```{r dataCleaning, dependson=-1}
 
 for (i in seq(length(rawSubjectsData))) {
   videoDataList[[i]] %<>%
