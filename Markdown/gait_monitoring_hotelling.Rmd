@@ -347,33 +347,19 @@ SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
   lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
 
 OCIdx <-  lapply(T2Profiles, function(x) {which(x$T2>x$UCL)})
-
 for (id in seq(length(SubgroupTimeList))) {
-  
   OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
-  
   RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
     sapply(function(x) {RPE[x,1]})
   
-  
   cat('###',paste0("Subject", id), "{-}",'\n')
-  
-  # plot(OCTime, rep(1, length(OCTime)), type="n", xlim=c(0,11000), xlab="Experiment Time",
-  #      ylab="")
-  
   plot(OCTime, rep(1, length(OCTime)), pch=16, xlim=c(0,11000), xlab="Experiment Time",
        ylab="", main=paste0("Subject", id))
-  
-  # abline(v=OCTime, col="black", lwd=0.5)
   abline(v=RPETime, col=c("blue", "red"), lwd=2)
   legend("topleft", legend=c(expression(RPE >= 13), expression(RPE >= 15)), col=c("blue", "red"),
          lty=1, lwd=2)
   cat('\n \n')
 }
-
-
-
-
 ```
 
 
@@ -497,11 +483,8 @@ SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
   lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
 
 OCIdx <-  lapply(T2Features, function(x) {which(x$T2>x$UCL)})
-
 for (id in seq(length(SubgroupTimeList))) {
-  
   OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
-  
   RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
     sapply(function(x) {RPE[x,1]})
   
