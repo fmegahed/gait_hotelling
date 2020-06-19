@@ -148,16 +148,19 @@ names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*",
 ## Data Preprocessing
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
 
-```{r dataCleaning}
+```{r dataCleaning, dependson="read"}
+####################################################################
+# When this runs the previous chink shou run. "dependson" does not solve this. I still need to find the way!
+####################################################################
 
-# for (i in seq(length(rawSubjectsData))) {
-#   videoDataList[[i]] %<>%
-#     dplyr::select(Leaves, Enters) %>%
-#     apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
-#     as.data.frame %>%
-#     mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
-#     filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
-# }
+for (i in seq(length(rawSubjectsData))) {
+  videoDataList[[i]] %<>%
+    dplyr::select(Leaves, Enters) %>%
+    apply(MARGIN=2, FUN=na.omit) %>% # removing NA observations
+    as.data.frame %>%
+    mutate(Enters = Enters - 600, Leaves = Leaves - 600) %>% # subtracting 600 seconds for warm-up
+    filter(Enters > 0 & Leaves > 0) # removing observations/tasks, which contained any of the warm-up period
+}
 
 ```
 
@@ -336,7 +339,7 @@ Initialize.
 
 ```{r RPEvsProfile, fig.align='center', results='asis', out.width="100%"}
 # Reading the RPE values from gait_hotelling GitHub Repo:
-RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE.csv") %>% .[,-14]
+RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
 
 SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
   lapply(function(x) {do.call(c, x)}) %>%
@@ -472,7 +475,7 @@ Initialize.
 
 ```{r RPEvsFeature, fig.align='center', results='asis', out.width="100%"}
 # Reading the RPE values from gait_hotelling GitHub Repo:
-RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE.csv") %>% .[,-14]
+RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
 
 SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
   lapply(function(x) {do.call(c, x)}) %>%
