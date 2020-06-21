@@ -293,22 +293,49 @@ for (id in seq(length(subgroupList))) {
 names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 ```
 
-## Plots of $T^2$ on Gait Acceleration Profiles {.tabset .tabset-fade}
+
+## Plots of $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
 
 Initialize.
 
-```{r T2ProfilesPlot, fig.align='center', results='asis', out.width="100%"}
+```{r T2ProfilesRPEPlot, fig.align='center', results='asis', out.width="100%"}
+
+RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
+
+SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
+  lapply(function(x) {do.call(c, x)}) %>%
+  lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
 
 for (id in seq(length(subgroupList))) {
+  # for (id in 1:2) {
   T2 <- T2Profiles[[id]]$T2
+  T2Time <- SubgroupTimeList[[id]]
   UCL <- T2Profiles[[id]]$UCL
   color <- ifelse(T2>UCL, "OC", "IC")
-  T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+  T2.df <- data.frame(T2Time=T2Time, T2=T2, col=color,
                       shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
-
+  
+  RPE.df <- data.frame(RPETime=RPE[,1], RPE=RPE[,id+1])
+  
+  ############# Needed to plot the secondary axis
+  ylim.prim <- range(pretty(T2))
+  ylim.sec <- c(6,20)
+  
+  b <- diff(ylim.prim)/diff(ylim.sec)
+  a <- b*(ylim.prim[1] - ylim.sec[1])
+  
+  ############# 
+  
   T2Plot <- ggplot(data=T2.df) +
-    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
-    geom_line(aes(x=subgroup, y=T2)) +
+    geom_point(aes(x=T2Time, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=T2Time, y=T2)) +
+    xlab("Experiment Time (s)") + ylab(expression(paste("T"^2, " Profiles"))) +
+    
+    geom_line(data=RPE.df, mapping=aes(x=RPETime, y=a+RPE*b), color="blue", size=1) +
+    # annotate("text", x=RPE.df$RPETime[5], y=(RPE.df$RPE[5]*b*1.1)+a, label="RPE", 
+    #        size=5, color="blue") +
+    scale_y_continuous(sec.axis=sec_axis(trans=~ (. - a)/b,
+                                       name="RPE Borg Scale")) +
 
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
@@ -320,48 +347,19 @@ for (id in seq(length(subgroupList))) {
     theme_bw() +
     theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
           axis.text=element_text(size=15),
-          axis.title=element_text(size=20),
+          axis.title=element_text(size=20, color="black"),
           legend.title=element_blank(), # This removes the legend title
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
-          legend.key = element_rect(fill="grey"))
+          legend.key = element_rect(fill="grey"),
+          axis.title.y.right=element_text(color="blue"),
+          axis.text.y.right=element_text(color="blue"))
 
   cat('###',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
 }
 ```
-
-
-## RPE and Profiles $T^2$ Charts {.tabset .tabset-fade}
-
-Initialize.
-
-```{r RPEvsProfile, fig.align='center', results='asis', out.width="100%"}
-# Reading the RPE values from gait_hotelling GitHub Repo:
-RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
-
-SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
-  lapply(function(x) {do.call(c, x)}) %>%
-  lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
-
-OCIdx <-  lapply(T2Profiles, function(x) {which(x$T2>x$UCL)})
-for (id in seq(length(SubgroupTimeList))) {
-  OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
-  RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
-    sapply(function(x) {RPE[x,1]})
-
-  cat('###',paste0("Subject", id), "{-}",'\n')
-  plot(OCTime, rep(1, length(OCTime)), pch=16, xlim=c(0,11000), xlab="Experiment Time",
-       ylab="", main=paste0("Subject", id))
-  abline(v=RPETime, col=c("blue", "red"), lwd=2)
-  legend("topleft", legend=c(expression(RPE >= 13), expression(RPE >= 15)), col=c("blue", "red"),
-         lty=1, lwd=2)
-  cat('\n \n')
-}
-```
-
-
 
 
 ## $T^2$ Calculations on Gait Features
@@ -429,22 +427,49 @@ names(X0Updated) <- paste0("subject", c(1:12, 14:15))
 names(SWList) <- paste0("subject", c(1:12, 14:15))
 ```
 
-## Plots of $T^2$ on Gait Features {.tabset .tabset-fade}
+
+## Plots of $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
 
 Initialize.
 
-```{r T2FeaturesPlot, fig.align='center', results='asis', out.width="100%"}
+```{r T2FeaturesRPEPlot, fig.align='center', results='asis', out.width="100%"}
+
+RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
+
+SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
+  lapply(function(x) {do.call(c, x)}) %>%
+  lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
 
 for (id in seq(length(subgroupList))) {
+  # for (id in 1:2) {
   T2 <- T2Features[[id]]$T2
+  T2Time <- SubgroupTimeList[[id]]
   UCL <- T2Features[[id]]$UCL
   color <- ifelse(T2>UCL, "OC", "IC")
-  T2.df <- data.frame(subgroup=1:length(T2), T2=T2, col=color,
+  T2.df <- data.frame(T2Time=T2Time, T2=T2, col=color,
                       shape=c(rep("Phase 1", 20), rep("Phase 2", length(T2) - 20)))
-
+  
+  RPE.df <- data.frame(RPETime=RPE[,1], RPE=RPE[,id+1])
+  
+  ############# Needed to plot the secondary axis
+  ylim.prim <- range(pretty(T2))
+  ylim.sec <- c(6,20)
+  
+  b <- diff(ylim.prim)/diff(ylim.sec)
+  a <- b*(ylim.prim[1] - ylim.sec[1])
+  
+  ############# 
+  
   T2Plot <- ggplot(data=T2.df) +
-    geom_point(aes(x=subgroup, y=T2, shape=shape, col=col), size=2.5) +
-    geom_line(aes(x=subgroup, y=T2)) +
+    geom_point(aes(x=T2Time, y=T2, shape=shape, col=col), size=2.5) +
+    geom_line(aes(x=T2Time, y=T2)) +
+    xlab("Experiment Time (s)") + ylab(expression(paste("T"^2, " Features"))) +
+    
+    geom_line(data=RPE.df, mapping=aes(x=RPETime, y=a+RPE*b), color="blue", size=1) +
+    # annotate("text", x=RPE.df$RPETime[5], y=(RPE.df$RPE[5]*b*1.1)+a, label="RPE", 
+    #        size=5, color="blue") +
+    scale_y_continuous(sec.axis=sec_axis(trans=~ (. - a)/b,
+                                       name="RPE Borg Scale")) +
 
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
@@ -456,48 +481,19 @@ for (id in seq(length(subgroupList))) {
     theme_bw() +
     theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
           axis.text=element_text(size=15),
-          axis.title=element_text(size=20),
+          axis.title=element_text(size=20, color="black"),
           legend.title=element_blank(), # This removes the legend title
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
-          legend.key = element_rect(fill="grey"))
+          legend.key = element_rect(fill="grey"),
+          axis.title.y.right=element_text(color="blue"),
+          axis.text.y.right=element_text(color="blue"))
 
   cat('###',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
 }
 ```
-
-
-## RPE and Features $T^2$ Charts {.tabset .tabset-fade}
-
-Initialize.
-
-```{r RPEvsFeature, fig.align='center', results='asis', out.width="100%"}
-# Reading the RPE values from gait_hotelling GitHub Repo:
-RPE <- read.csv("https://raw.githubusercontent.com/fmegahed/gait_hotelling/master/Data/csvFiles/RPE/RPE.csv") %>% .[,-14]
-
-SubgroupTimeList <- subgroupList %>% lapply(function(x) {x$LHD[c(2,3)]}) %>%
-  lapply(function(x) {do.call(c, x)}) %>%
-  lapply(function(x) {sapply(x, function(a) {median(a[,4])})})
-
-OCIdx <-  lapply(T2Features, function(x) {which(x$T2>x$UCL)})
-for (id in seq(length(SubgroupTimeList))) {
-  OCTime <- SubgroupTimeList[[id]] %>% .[OCIdx[[id]]]
-  RPETime <- list(which(RPE[,id+1]>=13) %>% min(), which(RPE[,id+1]>=15) %>% min()) %>%
-    sapply(function(x) {RPE[x,1]})
-
-  cat('###',paste0("Subject", id), "{-}",'\n')
-  plot(OCTime, rep(1, length(OCTime)), pch=16, xlim=c(0,11000), xlab="Experiment Time",
-       ylab="", main=paste0("Subject", id))
-  abline(v=RPETime, col=c("blue", "red"), lwd=2)
-  legend("topleft", legend=c(expression(RPE >= 13), expression(RPE >= 15)),
-         col=c("blue", "red"), lty=1, lwd=2)
-  cat('\n \n')
-}
-```
-
-
 
 # Diagnosis of Gait Features
 
