@@ -63,6 +63,7 @@ packages = c("tidyverse", "magrittr", # typical data analysis packages
              "foreach", "parallel", # packages used for parallelizing some code chunks
              "MALDIquant", # match closest points between two vectors
              "MASS", # calculates the generalized inverse matrix
+             "fda.usc", # Used for visual diagnosis plotting
              "R.matlab")
 newPackages = packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(newPackages) > 0) install.packages(newPackages)
@@ -148,10 +149,10 @@ names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*",
 ## Data Preprocessing
 In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
 
+
+<span style="color: blue;">-----------The previous chunk ("read"), have to run when the following chunk runs. When I add "dependson="dataCleaning" to the previous chunk ("read"), it always reruns causes knitting to take a long time. ---------------</span>. 
+
 ```{r dataCleaning, dependson="read"}
-####################################################################
-# When this runs the previous chink shou run. "dependson" does not solve this. I still need to find the way!
-####################################################################
 
 for (i in seq(length(rawSubjectsData))) {
   videoDataList[[i]] %<>%
