@@ -498,6 +498,56 @@ for (id in seq(length(subgroupList))) {
 
 # Diagnosis of Gait Features
 
+## Visual Inspection of Profile $T^2$ {.tabset .tabset-fade}
+
+Initialize.
+
+```{r T2ProfilesVisDiag, fig.align='center', results='asis', out.width="100%"}
+
+
+for (id in seq(length(subgroupList))) {
+  
+  phase1ExpTimes <- subgroupList[[id]]$LHD$X1 %>% sapply(function(x) {x[,4]}) %>%
+    do.call(what=c)
+  
+  
+  a <- subjectProfilesList[id][[1]] %>% .[(numRows[id]+1):(2*numRows[id])] %>%
+    lapply(unlist) %>% lapply(as.vector)
+  
+  a %<>%  lapply(function(x) {c(x, rep(NA, (max(lengths(a)) - length(x))))}) %>%
+    do.call(what=rbind)
+  
+  expT <- subjectProfilesList[id][[1]] %>% .[(4*numRows[id]+1):(5*numRows[id])] %>%
+    sapply(function(x) {x[[1]][1,1]})
+  
+  # Should the grey profiles include phase0???????????????????????????
+  phase1Idx <- match.closest(phase1ExpTimes, expT)
+  
+  # for (i in which(T2Profiles[[id]]$T2 > T2Profiles[[id]]$UCL)) {
+  #   print(i)
+  # }
+  
+  subgIdx <- T2Profiles[[id]]$T2[21:length(T2Profiles[[id]]$T2)] %>%
+    which.max() # Subgroup with highest T2 in X2 (phase 2)
+  LargestT2Times <- subgroupList[[id]]$LHD$X2[[subgIdx]][,4]
+  OCIdx <- match.closest(LargestT2Times, expT)
+  
+  ##################### Plot
+  
+  cat('###',paste0("Subject", id), "{-}",'\n')
+  
+  plot(fdata(a[phase1Idx,]), col="grey", ylim=c(-5, 40), xlim=c(0, 70),
+       xlab="Gait Time Index", ylab="Acceleration Magnitude",
+       cex.axis=1.5, cex.lab=1.5, cex.main=1.5,
+       main="Profile Visual Inspection")
+  lines(fdata(a[OCIdx,]), col="red")
+  legend("topleft", legend=c("Phase 1 Profiles", expression("Subgroup with Largest T"^2)),
+                             lty=1, col=c("grey", "red"), lwd=4, cex=1)
+  
+  cat('\n \n')
+}
+```
+
 ## Decomposition of Features $T^2$
 
 Initialize.
