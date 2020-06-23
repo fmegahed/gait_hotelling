@@ -109,21 +109,21 @@ subjectFeaturesList <- vector(mode = "list", length = length(rawSubjectsData)) #
 names(subjectFeaturesList) <- names(rawSubjectsData)
 
 for (i in seq(length(rawSubjectsData))) {
-  gaitLength <-  rawSubjectsData[[i]][ 1:numRows[i] ] %>% 
+  StrideLength <-  rawSubjectsData[[i]][ 1:numRows[i] ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist() %>% 
     `/` (subject_heights[i])
   
-  gaitHeight <- rawSubjectsData[[i]][ (1+numRows[i]):(2*numRows[i]) ] %>% 
+  StrideHeight <- rawSubjectsData[[i]][ (1+numRows[i]):(2*numRows[i]) ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist() %>% 
     `/` (subject_heights[i])
   
-  gaitDuration <- rawSubjectsData[[i]][ (1+ 2*numRows[i]):(3*numRows[i]) ] %>% 
+  StrideDuration <- rawSubjectsData[[i]][ (1+ 2*numRows[i]):(3*numRows[i]) ] %>% 
     lapply(range) %>% lapply(diff) %>% unlist(recursive = TRUE)
   
   expTime <- rawSubjectsData[[i]][ (1+ 16*numRows[i]):(17*numRows[i]) ] %>% 
     lapply(unlist) %>% lapply(min) %>% unlist()
   
-  subjectFeaturesList[[i]] <- cbind(gaitLength, gaitHeight, gaitDuration, expTime)
+  subjectFeaturesList[[i]] <- cbind(StrideLength, StrideHeight, StrideDuration, expTime)
 }
 
 
@@ -289,7 +289,7 @@ for (id in seq(length(subgroupList))) {
   X12Mean <- sapply(c(X1, X2), colMeans) %>% t()
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
-  T2Profiles[[id]] <- list(T2=T2, UCL=UCL)
+  T2Profiles[[id]] <- list(T2=T2, UCL=UCL, UCL0=UCL0)
 }
 names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 ```
@@ -419,7 +419,7 @@ for (id in seq(length(subgroupList))) {
   T2 <- rep.row(X0PooledMean, length(c(X1, X2))) %>% -(X12Mean) %>%
     apply(MARGIN=1, function(x) x %*% ginv(S_w) %*% x)
 
-  T2Features[[id]] <- list(T2=T2, UCL=UCL)
+  T2Features[[id]] <- list(T2=T2, UCL=UCL, UCL0=UCL0)
   X0Updated[[id]] <- list(X0=X0)
   SWList[[id]] <- list(S_w=S_w)
 }
@@ -624,7 +624,7 @@ for (id in seq(length(subgroupList))) {
   T2 <- T2Features[[id]]$T2
   UCL <- T2Features[[id]]$UCL
   
-  cat('###',paste0("Subject", id), "{.tabset .tabset-fade}",'\n')
+  cat('###',paste0("Subject", id), "{.tabset .tabset-fade}", '\n')
   
   featurePair <- combn(x=length(X0PooledMean), m=2)
   for (i in seq(ncol(featurePair))) {
@@ -649,14 +649,14 @@ for (id in seq(length(subgroupList))) {
                      function(x) {(x- X0PooledMean[f]) %*% solve(S_w[f,f]) %*% (x- X0PooledMean[f])})
     T2_grid <- matrix(T2_grid, ngrid, ngrid)
     
-    cat('####',paste0("Features: ", f), "{-}",'\n')
+    cat('####',paste("Features", f[1], "&", f[2]), "{-}",'\n')
     ######################################################## Plot
     ############## Plot the contour
     # old.par <- par()
     
     par(mar=c(5, 5, 4, 2) + 0.1)
     
-    plot(1 ,1, type = "o", xlim = xlim, ylim = ylim, main="Ellipse Chart", cex.main=1.5,
+    plot(1 ,1, type = "n", xlim = xlim, ylim = ylim, main="Ellipse Chart", cex.main=1.5,
          xlab=paste0(colnames(X0[[1]])[f[1]], " (m)"),
          ylab=paste0(ylab=colnames(X0[[1]])[f[2]], " (s)"),
          cex.axis=1.5, cex.lab=1.5)
