@@ -601,6 +601,7 @@ for (id in seq(length(subgroupList))) {
     tmp <- replace(tmp, tmp==1, "Stride Length")
     tmp <- replace(tmp, tmp==2, "Stride Height")
     tmp <- replace(tmp, tmp==3, "Stride Duration")
+    tmp <- replace(tmp, tmp==0, "-")
     tmpList[[ii]] <- tmp
     colnames(tmpList[[ii]]) <- c("Decomposition", "Control Limit",
                                  "Selected Feature 1", "Selected Feature 2",
