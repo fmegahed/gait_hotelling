@@ -582,7 +582,7 @@ for (id in seq(length(subgroupList))) {
       apply(MARGIN=1, function(x) x %*% solve(S_w[b,b]) %*% x)
 
     sampled <- matrix(sample(T2, 1000 * length(T2), replace=T), ncol=20, byrow=T)
-    q[i,2] <- apply(sampled, 1, quantile, probs=1-alpha) %>% mean()
+    q[i,2] <- apply(sampled, 1, quantile, probs=1-alpha) %>% mean() %>% round(digits=3)
   }
 
   ############## Decompose T2 for every out of control data point
@@ -594,13 +594,17 @@ for (id in seq(length(subgroupList))) {
       b <- subset(q[i,3:ncol(q)], q[i,3:ncol(q)] > 0)
       q[i,1] <- t(X0PooledMean[b]-X12Mean[t3[ii],][b]) %*%
         solve(S_w[b,b]) %*%
-        (X0PooledMean[b]-X12Mean[t3[ii],][b])
+        (X0PooledMean[b]-X12Mean[t3[ii],][b]) %>% round(digits=3)
     }
     ############ Store decomposed elements
-    tmpList[[ii]] <- data.frame(q)
-    colnames(tmpList[[ii]]) <- c("decomposition", "decomposition control limit",
-                                 "selected feature 1", "selected feature 2",
-                                 "selected feature 3")
+    tmp <- data.frame(q)
+    tmp <- replace(tmp, tmp==1, "Stride Length")
+    tmp <- replace(tmp, tmp==2, "Stride Height")
+    tmp <- replace(tmp, tmp==3, "Stride Duration")
+    tmpList[[ii]] <- tmp
+    colnames(tmpList[[ii]]) <- c("Decomposition", "Control Limit",
+                                 "Selected Feature 1", "Selected Feature 2",
+                                 "Selected Feature 3")
     
     cat('####',paste0("subgroup ", t3[[ii]]), "{-}",'\n')
     print(knitr::kable(tmpList[[ii]]))
@@ -608,10 +612,18 @@ for (id in seq(length(subgroupList))) {
     
   }
   
+  cat('\n \n')
+  
   names(tmpList) <- paste0("subgroup ", t3)
   qList[[id]] <- tmpList
 }
 names(qList) <- paste0("subject", c(1:12, 14:15))
+
+
+# write.csv(qList[[1]][[1]], file="C:/Users/Saeb/Desktop/decomposition.csv", quote=F)
+# 
+# write.table(qList[[1]][[1]], file="C:/Users/Saeb/Desktop/decomposition.txt", quote=F)
+
 ```
 
 
