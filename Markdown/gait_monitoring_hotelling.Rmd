@@ -507,25 +507,25 @@ Initialize.
 
 for (id in seq(length(subgroupList))) {
   
-  phase1ExpTimes <- subgroupList[[id]]$LHD$X1 %>% sapply(function(x) {x[,4]}) %>%
-    do.call(what=c)
-  
-  
+  ##################### Create the acc matrix with ncol=largest length with NA's 
   a <- subjectProfilesList[id][[1]] %>% .[(numRows[id]+1):(2*numRows[id])] %>%
     lapply(unlist) %>% lapply(as.vector)
   
-  a %<>%  lapply(function(x) {c(x, rep(NA, (max(lengths(a)) - length(x))))}) %>%
+  a %<>% lapply(function(x) {c(x, rep(NA, (max(lengths(a)) - length(x))))}) %>%
     do.call(what=rbind)
   
+  ##################### Find cleaned phase 0 indices in acc matrix
+  X0Pooled <- subgroupList[[id]]$Acc$X0 %>% do.call(what=rbind)
+  T2_0 <- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+    apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+  
+  UCL0 <- T2Profiles[[id]]$UCL0
+  
+  phase0Idx <- setdiff(1:nrow(X0Pooled), which(T2_0>UCL0))
+  
+  ##################### Find indices of observations within subgroup with largest T2 in acc matrix
   expT <- subjectProfilesList[id][[1]] %>% .[(4*numRows[id]+1):(5*numRows[id])] %>%
     sapply(function(x) {x[[1]][1,1]})
-  
-  # Should the grey profiles include phase0???????????????????????????
-  phase1Idx <- match.closest(phase1ExpTimes, expT)
-  
-  # for (i in which(T2Profiles[[id]]$T2 > T2Profiles[[id]]$UCL)) {
-  #   print(i)
-  # }
   
   subgIdx <- T2Profiles[[id]]$T2[21:length(T2Profiles[[id]]$T2)] %>%
     which.max() # Subgroup with highest T2 in X2 (phase 2)
@@ -536,13 +536,17 @@ for (id in seq(length(subgroupList))) {
   
   cat('###',paste0("Subject", id), "{-}",'\n')
   
-  plot(fdata(a[phase1Idx,]), col="grey", ylim=c(-5, 40), xlim=c(0, 70),
-       xlab="Gait Time Index", ylab="Acceleration Magnitude",
-       cex.axis=1.5, cex.lab=1.5, cex.main=1.5,
-       main="Profile Visual Inspection")
+  plot(fdata(a[phase0Idx,]), col="grey", ylim=c(-5, 40), xlim=c(0, 70),
+     xlab="Gait Time Index", ylab="Acceleration Magnitude",
+     cex.axis=1.5, cex.lab=1.5, cex.main=1.5,
+     main="Profile Visual Inspection")
+
+  # rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col=gray(0.7, 0.3))
+  grid(col="gray")
   lines(fdata(a[OCIdx,]), col="red")
-  legend("topleft", legend=c("Phase 1 Profiles", expression("Subgroup with Largest T"^2)),
-                             lty=1, col=c("grey", "red"), lwd=4, cex=1)
+  legend("topleft", legend=c("Phase 0 Profiles Excluding Outliers",
+                             expression("Profiles Within the Subgroup with Largest T"^2)),
+         lty=1, col=c("grey", "red"), lwd=4, cex=1)
   
   cat('\n \n')
 }
