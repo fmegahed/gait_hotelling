@@ -624,11 +624,8 @@ for (id in seq(length(subgroupList))) {
 }
 names(qList) <- paste0("subject", c(1:12, 14:15))
 
-
 # write.csv(qList[[1]][[1]], file="C:/Users/Saeb/Desktop/decomposition.csv", quote=F)
-# 
 # write.table(qList[[1]][[1]], file="C:/Users/Saeb/Desktop/decomposition.txt", quote=F)
-
 ```
 
 
@@ -683,35 +680,38 @@ for (id in seq(length(subgroupList))) {
     ############## Plot the contour
     # old.par <- par()
     
-    par(mar=c(5, 5, 4, 2) + 0.1)
+    # par(mar=c(5, 5, 4, 2) + 0.1)
     
-    plot(1 ,1, type = "n", xlim = xlim, ylim = ylim, main="Ellipse Chart", cex.main=1.5,
+    plot(1 ,1, type = "n", xlim = xlim, ylim = ylim, main="Ellipse Chart",
          xlab=paste0(colnames(X0[[1]])[f[1]], " (m)"),
          ylab=paste0(ylab=colnames(X0[[1]])[f[2]], " (s)"),
-         cex.axis=1.5, cex.lab=1.5)
+         cex.axis=1.5, cex.lab=1.5, cex.main=1.5)
+    
+    grid()
     
     legend("topleft", legend=c("phase 0 subgroup means", "phase 1 subgroup means",
                                "X control limits", "Y control limits"),
-           col=c("green", "blue", "black", "brown"), pch=c(3,3,NA,NA), lty=c(NA,NA,2,2),
-           cex=1, pt.cex=2, lwd=2, bg="grey")
+           col=c("darkgreen", "blue", "black", "brown"), pch=c(3,3,NA,NA), lty=c(NA,NA,2,2),
+           cex=1, pt.cex=1.2, lwd=2, bg=gray(0.9), y.intersp=0.8)
     ################
-    idx <- apply(q[,3:5], MARGIN=1, function(r) all(c(f,0) %in% r)) %>% which()
-    contour(grid[,1], grid[,2], T2_grid, levels=q[idx,2], drawlabels=T, add=T)
+    tmp <- c("Stride Length", "Stride Height", "Stride Duration")[f]
+    idx <- apply(q[,3:5], MARGIN=1, function(r) all(c(tmp, "-") %in% r)) %>% which()
+    contour(grid[,1], grid[,2], T2_grid, levels=q[idx,2], drawlabels=T, add=T, labcex=1)
     
     ################ Plot phase 0 data
     center0 <- X0 %>% lapply(function(x) {x[,f]}) %>% sapply(colMeans) %>% t()
-    points(center0[,1], center0[,2], pch=3, cex=2, col="green", lwd=2)
+    points(center0[,1], center0[,2], pch=3, cex=1.5, col="darkgreen", lwd=2)
     # points(X0Pooled[,f], pch=1, cex=0.5, col="blue")
     
     ################ Plot phase 1 data
     center1 <- X1 %>% lapply(function(x) {x[,f]}) %>% sapply(colMeans) %>% t()
-    points(center1[,1], center1[,2], pch=3, cex=2, col="blue", lwd=2)
+    points(center1[,1], center1[,2], pch=3, cex=1.5, col="blue", lwd=2)
     # points(X1Pooled[,f], pch=1, cex=0.5, col="blue")
     
     ################ plot phase 1&2 data by subgroup number
     center12 <- c(X1,X2) %>% lapply(colMeans) %>% sapply(function(x) {x[f]}) %>% t()
     labels <- T2 %>% t() %>% as.data.frame() %>% names() %>% gsub(pattern='V', replacement='')
-    text(center12, labels=labels, cex = 1, col=ifelse(T2>UCL, "red", "black"))
+    text(center12, labels=labels, cex = 0.7, col=ifelse(T2>UCL, "red", "black"))
     
     ################ Plot univariate CL's
     abline(v=XLim, lty="dashed", col="black", lwd=2)
