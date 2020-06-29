@@ -335,8 +335,9 @@ for (id in seq(length(subgroupList))) {
     geom_line(data=RPE.df, mapping=aes(x=RPETime, y=a+RPE*b), color="blue", size=1) +
     # annotate("text", x=RPE.df$RPETime[5], y=(RPE.df$RPE[5]*b*1.1)+a, label="RPE", 
     #        size=5, color="blue") +
-    scale_y_continuous(sec.axis=sec_axis(trans=~ (. - a)/b,
-                                       name="RPE Borg Scale")) +
+    scale_y_continuous(limits=ylim.prim,
+                       sec.axis=sec_axis(trans=~ (. - a)/b,
+                                       name="RPE Borg Scale", breaks=seq(6,20,2))) +
 
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
@@ -469,8 +470,9 @@ for (id in seq(length(subgroupList))) {
     geom_line(data=RPE.df, mapping=aes(x=RPETime, y=a+RPE*b), color="blue", size=1) +
     # annotate("text", x=RPE.df$RPETime[5], y=(RPE.df$RPE[5]*b*1.1)+a, label="RPE", 
     #        size=5, color="blue") +
-    scale_y_continuous(sec.axis=sec_axis(trans=~ (. - a)/b,
-                                       name="RPE Borg Scale")) +
+    scale_y_continuous(limits=ylim.prim,
+                       sec.axis=sec_axis(trans=~ (. - a)/b,
+                                       name="RPE Borg Scale", breaks=seq(6,20,2))) +
 
     geom_hline(yintercept=UCL) +
     annotate("text", 2, UCL, vjust=-1, label="UCL", size=5) +
