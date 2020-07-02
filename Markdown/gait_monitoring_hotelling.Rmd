@@ -63,7 +63,7 @@ packages = c("tidyverse", "magrittr", # typical data analysis packages
              "foreach", "parallel", # packages used for parallelizing some code chunks
              "MALDIquant", # match closest points between two vectors
              "MASS", # calculates the generalized inverse matrix
-             "fda.usc", # Used for visual diagnosis plotting
+             "fda.usc", # Used for visual diagnostic plotting
              "R.matlab")
 newPackages = packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(newPackages) > 0) install.packages(newPackages)
@@ -83,14 +83,14 @@ startTime <- Sys.time()
 # Extracting, Transforming and Loading (ETL) the Gait Data into R
 In this paper, we perform a secondary data analysis of the experimental data reported in @baghdadi2019monitoring, where fifteen participants were equipped with an IMU sensor wrapped on their right ankle. We used the IMU data to transform the linear acceleration signals from the local frame of reference to the global frame of reference. Next, we calculated the acceleration magnitude signal and smoothed it by applying a low pass butterworth filter with a cut-off frequency of 10 Hz. Further, we segmented the idividual gait cycles from foot-flat to foot-flat for each participant by tuning the parameters of the segmentation algorithm for each participant.  
 
-We load **four different sets of data** into R:  
+We load **four different sets of data** into R:
 
-  -  *Subject heights*, which is read directly from the [GitHub Repository](https://github.com/fmegahed/fatigue-changepoint) of the @baghdadi2019monitoring paper. Note that we have excluded Subject 13's data due to <span style="color: blue;">-----------we need to insert some reasons here---------------</span>.    
-  - *Features*, where we extract the *x* and *y* positions as well as *stride duration* and *experimental time*. The first three elements are used to compute stride length, height and duration which are three important kinematic features that can be used to model/monitor changes in gait. Note that we did not use this data directly from the @baghdadi2019monitoring paper since our segmentation here was from foot-flat to foot-flat and a different frequency for the butterworth filter was used (given that the goals of our paper and the original paper are different).    
+  -  *Subject heights*, which is read directly from the [GitHub Repository](https://github.com/fmegahed/fatigue-changepoint) of the @baghdadi2019monitoring paper. Note that we have excluded Subject 13's data as the segmentation algorithm falls short of detecting the gaits in this subject. Shape of acceleration magnitude signal did not contain the distinguishable larger peak, commonly reflected in gait cycles. Moreover, we did not include the results for subjects 5 & 7 in our analysis as they did not complete the experiment. This inclusion criteria was considered to allow for enough data to construct the 3 phases effectively.
+  - *Features*, where we extract the positions in Frennet Serret coordinates as well as the stride duration. *Stride length*, *stride height*, and *stride duration* along with *experimental time* for all subjects are subsequently calculated. The $1^{st}$ three are important kinematic features that are used to model/monitor changes in gait in one of the two schemes, implemented in this work. Note that we did not use this data directly from the @baghdadi2019monitoring paper since our segmentation here was from foot-flat to foot-flat and a different cut-off frequency for the Butterworth filter was used (given that the goals of our paper and the original paper are different).    
   - *Profiles*, where the points forming each gait segment are mantained. The profiles present an alternative approach to monitoring and modeling changes in the gait cycles.   
-  - *Video tags*, where have coded when subjects enter and leave the main laboratory room. This information is used to ensure the consistency of the task being performed by the participant, i.e., we do not want the detected changes to correspond to a task change, but rather to indicate fatigue (see the discussion in our manuscript for more details).
+  - *Video tags*, contains the time stamps when subjects enter and leave the main laboratory space where the non-walking task (loading/unloading) takes place. This information is used to ensure the consistency of the task being performed by the participant, i.e., we do not want to detect the changes due to a change in the undertaken task, but rather due to fatigue (see the discussion in our manuscript for more details).
 
-The code chunk below provides our code for reading the three different datasets. The *subject heights* dataset is saved into a vector, which we use to scale the computed gait/stride length and height. The main outputs from this chunk are two lists (a) **subjectFeaturesList** which contains the *scaled stride length*, *scaled stride height*, *stride duration* and *experimental time*, and (b) **subjectProfilesList** which contains the sample IMU acceleration points making each acceleration profile.
+The code chunk below provides our code for reading the three different datasets. The *subject heights* dataset is saved into a vector, which we use to scale the computed gait/stride length and height. The main outputs from this chunk are two lists (a) **subjectFeaturesList** which contains the *scaled stride length*, *scaled stride height*, *stride duration* and *experimental time*, and (b) **subjectProfilesList** which contains the sample IMU acceleration magnitude points making each acceleration profile.
 ```{r read}
 # Reading the subject Heights from the Baghdadi et al. (2019) GitHub Repo:
 # ------------------------------------------------------------------------
@@ -147,10 +147,7 @@ names(videoDataList) <- sapply(videoFiles, str_extract_all, "Subject[:digit:]*",
 # Data Preprocessing and Rational Subgroups
 
 ## Data Preprocessing
-In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. <span style="color: blue;">WE NEED TO CONTINUE THE DISUCSSION OF WHAT WE HAVE DONE IN THIS SECTION. I STOPPED WORKING ON THIS UNTIL WE DISCUSS. \n Saeb, this is currently slightly different from your implementation as I am removing any task that spanned the warm-up period; I think this is a cleaner way of doing it and it will not change your preliminary results much </span>
-
-
-<span style="color: blue;">-----------The previous chunk ("read"), have to run when the following chunk runs. When I add "dependson="dataCleaning" to the previous chunk ("read"), it always reruns causes knitting to take a long time. ---------------</span>. 
+In Section 2, we have read four different data sets and extracted the three gait features. In this subsection, we perform further preprocessing of the data. Specifically, we remove the first 10 minutes of experimental data from the `videoDataList` since these corresponded to the warm-up period of the experiment as detailed in @maman2017data, @baghdadi2019monitoring, and @maman2020data. Next, we update the `videoDataList` by preserving the time points when the subject enters and leaves the lab space where the loading/ unloading task occurs. This list will be used in the following code chunks to only preserve the feature/ profile data corresponding to the continues walking periods.
 
 ```{r dataCleaning, dependson="read"}
 
@@ -167,9 +164,11 @@ for (i in seq(length(rawSubjectsData))) {
 
 
 ## Rational Subgroups
-Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the retained segmented gait cycles is no longer almost constant since relatively large time gaps exist, which correspond to when the participant is in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:
+Given the nature of the experimental study, the subjects performed varying tasks that may affect our gait analysis; we have only examined data where the subjects are outside of the main laboratory room since this captures the material handling component of the examined task. An immediate consequence of using only "out-of-the-room" data is that the time differences between the preserved segmented gait cycles is no longer almost constant since relatively large time gaps is introduced to the data that corresponds to the periods of loading/ unloading in the room. For this reason, we have subgrouped the data. Consecutive "out-of-the-room" gait cycles are placed in one subgroup. Statistically speaking, our subgrouping strategy follows the **rational subgrouping** mantra in statistical surveillance. The purpose of rational subgrouping is two-fold:
 
-  - Minimize the variability within a subgroup such that the witin-group variability captures the natural variability in the gait cycles.
+<!-- Moreover, subgrouping enables us to detect the changes in subgrouped gait cycles instead of individual ones. This results in a more robust monitoring scheme since it can detect more sustained changes. -->
+
+  - Minimize the variability within a subgroup such that the within-group variability captures the natural variability in the gait cycles.
   - Between group variability can be used to capture the effects of "assignable causes of variability", which can include disease progression, fatigue, etc.
 
 For more details on rational subgrouping, we refer the reader to @montgomery2019introduction for more details. The code chunk below provides our approach to creating the rational subgroups for both the "profile" and "gait features" data sets.
@@ -234,10 +233,23 @@ names(subgroupList) <- c(paste0("subject", c(1:12, 14:15)))
 
 # $T^2$ Calculations
 
+Using $T^2$ statistic, we compared the mean of subgroups against a reference multivariate distribution by accounting for the correlation between different variables. We calculated the $T^2$ for subgroups using the method introduced in @mason2001applying. Also, to construct a $T^2$ chart, one needs to find the control limits based on the distribution parameters. However, as we investigated the gait data in our analysis, it did not follow a parametric distribution. Therefore, we implemented a non-parametric approach to bootstrap the control limits in both retrospective and prospective phases using the approach in @phaladiganon2011bootstrap.
+
+
 ## $T^2$ Calculations on Gait Acceleration Profiles
 
+Our $T^2$ charting approach is comprised of 3 steps as described below:
+
+1. **phase 0:** The purpose of phase 0 is to construct a clean *in-control* data set that captures the reference distribution. In this phase we remove the outliers in one pass and update the subgroups. Then we calculate the within-batch covariance and the mean of the subgroups that will be used for $T^2$ calculations in the following phases.
+
+2. **phase 1:**
+
+3. **phase 2:**
+
+the reference multivariate distribution is defined in phase 0. This accounts for the correlation between the variables.
 Initialize.
 
+In the following sections we present the control charts for retrospective phase (phase0) and the prospective phase (phase 1 & 2).
 
 ```{r T2Profiles}
 T2Profiles <- list()
