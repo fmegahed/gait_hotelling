@@ -609,9 +609,11 @@ for (id in seq(length(subgroupList))) {
 
 # Diagnosis of Gait Features
 
+For acceleration profile monitoring we provide a visual diagnostic tool where the change in the profiles are compared against the *in-control* profiles. For feature monitoring scheme we implemented a quantitative diagnostic approach along with visual tools.
+
 ## Visual Inspection of Profile $T^2$ {.tabset .tabset-fade}
 
-Initialize.
+For acceleration profiles we visualized the gait profiles in an *out-of-control* subgroup against the profiles in phase 0. In the following plots we present the profiles in the subgroup with largest $T^2$ value in every subject. The *out-of-control* profiles are plotted in red agains the phase 0 profiles in gray. These plots provides insights about the nature of change in gait profiles that caused the signal. The two most prominent changes that are observed in gait profiles are emerged as reduction in profile peak values as well as shifts in the location of the peaks. While different peak values indicate the change in the acceleration magnitude the shift indicates change in the gait duration.
 
 ```{r T2ProfilesVisDiag, fig.align='center', results='asis', out.width="100%"}
 
@@ -665,7 +667,7 @@ for (id in seq(length(subgroupList))) {
 
 ## Decomposition of Features $T^2$ {.tabset .tabset-fade}
 
-Initialize.
+For feature monitoring scheme we decomposed the $T^2$ statistic for each individual feature as well as each pair of the features. Calculation of the decomposed components were performed similar to the $T^2$ calculation explained in previous sections. We also calculated the control limits for each decomposition using similar bootstrapping technique. Below the decomposition results for all *out-of-control* subgroups along with their control limits are presented for each subject.
 
 
 ```{r T2Decompose, results='asis'}
@@ -742,7 +744,7 @@ names(qList) <- paste0("subject", c(1:12, 14:15))
 
 ## 2D Ellipse plots {.tabset .tabset-fade}
 
-Initialize.
+We also provide ellipse charts for the $T^2$ decomposition in the gait feature monitoring scheme. Each chart contains the decomposition results for a pair of features. Since in this scheme we work with 3 features, there will be three paired combination of features and thus three ellipse charts for each subject. The straight lines show the control limits for individual features and the ellipse visualizes the control limit for the feature pair. The ellipse charts enable us to see whether the individual features fall outside their univariate limits or a change in the correlation between the two features caused the *out-of-control* signal. They also help understanding the extent of contribution of each feature/ feature pair to the signal. Below we provide the charts for each subject where each subgroup is depicted by the subgroup number and the *out-of-control* subgroups are colored in red.
 
 
 ```{r Ellipsechart, fig.align='center', results='asis', out.width="100%"}
