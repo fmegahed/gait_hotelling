@@ -231,25 +231,22 @@ names(subgroupList) <- c(paste0("subject", c(1:12, 14:15)))
 ```
 
 
-# $T^2$ Calculations
+# $T^2$ Charting
 
-Using $T^2$ statistic, we compared the mean of subgroups against a reference multivariate distribution by accounting for the correlation between different variables. We calculated the $T^2$ for subgroups using the method introduced in @mason2001applying. Also, to construct a $T^2$ chart, one needs to find the control limits based on the distribution parameters. However, as we investigated the gait data in our analysis, it did not follow a parametric distribution. Therefore, we implemented a non-parametric approach to bootstrap the control limits in both retrospective and prospective phases using the approach in @phaladiganon2011bootstrap.
+Using $T^2$ statistic, we compare the mean of subgroups against a reference multivariate distribution by accounting for the correlation between different variables. We calculated the $T^2$ for subgroups using the method introduced in @mason2001applying. Also, to construct a $T^2$ chart, one needs to find the control limits. The control limits are conventionally calculated using the distribution parameters. However, as we investigated the gait data in our analysis, it did not follow any parametric distribution. Therefore, we implemented a non-parametric approach to bootstrap the control limits in both retrospective and prospective phases using the method in @phaladiganon2011bootstrap.
 
 
-## $T^2$ Calculations on Gait Acceleration Profiles
+## $T^2$ for Gait Acceleration Profiles
 
-Our $T^2$ charting approach is comprised of 3 steps as described below:
+Our $T^2$ charting approach is comprised of 3 phases as described below:
 
-1. **phase 0:** The purpose of phase 0 is to construct a clean *in-control* data set that captures the reference distribution. In this phase we remove the outliers in one pass and update the subgroups. Then we calculate the within-batch covariance and the mean of the subgroups that will be used for $T^2$ calculations in the following phases.
+1. **phase 0:** The purpose of phase 0 is to construct a clean *in-control* data set that captures the distribution of the reference data. In this phase we removed the outliers in one pass and updated the subgroups. Then we calculated the within-batch covariance and subgroup means to be used in the following phases.
 
-2. **phase 1:**
+2. **phase 1:** Although this phase is part of the prospective phase, the control limit for the monitoring phase is calculated using the data in this phase. This is due to the fact that the distribution of the data in retrospective phase differs from that of prospective phase and therefore cannot be directly used for bootstrapping the control limits. To tht end, a set of data from the prospective phase were isolated to be used for bootstrapping the control limit. Note that this set of data were not used for the calculation of the covariance in phase 0.
 
-3. **phase 2:**
+3. **phase 2:** The $T^2$ was calculated for each prospective subgroup using the mean and covariance parameters, calculated from the phase 0 data. The $T^2$ chart was constructed and the $T^2$ for each subgroup was compared against the control limit. The chart generates an *out-of-control* signal when the $T^2$ is larger than the control limit.
 
-the reference multivariate distribution is defined in phase 0. This accounts for the correlation between the variables.
-Initialize.
-
-In the following sections we present the control charts for retrospective phase (phase0) and the prospective phase (phase 1 & 2).
+The three phases are implemented in the following code chunk. We present the control charts for the retrospective phase (phase0) and the prospective phase (phase 1 & 2) in the following sections.
 
 ```{r T2Profiles}
 T2Profiles <- list()
@@ -307,7 +304,54 @@ names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 ```
 
 
-## Plots of $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
+### Plots of Phase 0 $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
+
+Initialize.
+
+
+```{r T2Profilesphase0, fig.align='center', results='asis', out.width="100%"}
+
+for (id in seq(length(subgroupList))) {
+
+  X0Pooled <- subgroupList[[id]]$Acc$X0 %>% do.call(what=rbind)
+  T2_0 <- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+    apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+
+  UCL0 <- T2Profiles[[id]]$UCL0
+
+  ###############################################################
+  ############################################################### T2_0 plot
+  T2_0.df <- data.frame(gait=1:length(T2_0), T2_0=T2_0, col=ifelse(T2_0>UCL0, "OC", "IC"))
+
+  T2_0_plot <- ggplot(data=T2_0.df) +
+    geom_point(aes(x=gait, y=T2_0, color=col), size=2) +
+    scale_colour_manual(values = c("black", "red")) +
+
+    geom_hline(yintercept=UCL0) +
+    annotate("text", 2, UCL0, vjust=-1, label="UCL", size=5) +
+
+    ggtitle(paste0("Subject ", id)) +
+    xlab("Gait Index") + ylab(expression(T^2 ~ " in Phase 0")) +
+
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20, color="black"),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .85),
+          legend.text=element_text(size=15),
+          legend.key = element_rect(fill="grey"))
+
+  cat('####',paste0("Subject", id), "{-}",'\n')
+  print(T2_0_plot)
+  cat('\n \n')
+}
+
+```
+
+
+
+### Plots of $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
 
 Initialize.
 
@@ -369,14 +413,14 @@ for (id in seq(length(subgroupList))) {
           axis.title.y.right=element_text(color="blue"),
           axis.text.y.right=element_text(color="blue"))
 
-  cat('###',paste0("Subject", id), "{-}",'\n')
+  cat('####',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
 }
 ```
 
 
-## $T^2$ Calculations on Gait Features
+## $T^2$ for Gait Features
 
 Initialize.
 
@@ -442,7 +486,53 @@ names(SWList) <- paste0("subject", c(1:12, 14:15))
 ```
 
 
-## Plots of $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
+### Plots of Phase 0 $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
+
+Initialize.
+
+```{r T2Featuresphase0, fig.align='center', results='asis', out.width="100%"}
+for (id in seq(length(subgroupList))) {
+  
+  X0Pooled <- subgroupList[[id]]$LHD$X0 %>% do.call(what=rbind) %>% .[,1:3]
+  T2_0 <- rep.row(colMeans(X0Pooled), n=nrow(X0Pooled)) %>% -(X0Pooled) %>%
+    apply(MARGIN=1, function(x) {x %*% ginv(cov(X0Pooled)) %*% x})
+  
+  UCL0 <- T2Features[[id]]$UCL0
+  
+  ###############################################################
+  ############################################################### T2_0 plot
+  T2_0.df <- data.frame(gait=1:length(T2_0), T2_0=T2_0, col=ifelse(T2_0>UCL0, "OC", "IC"))
+  
+  T2_0_plot <- ggplot(data=T2_0.df) +
+    geom_point(aes(x=gait, y=T2_0, color=col), size=2) +
+    scale_colour_manual(values = c("black", "red")) +
+    
+    geom_hline(yintercept=UCL0) +
+    annotate("text", 2, UCL0, vjust=-1, label="UCL", size=5) +
+    
+    ggtitle(paste0("Subject ", id)) +
+    xlab("Gait Index") + ylab(expression(T^2 ~ " in Phase 0")) +
+    
+    theme_bw() +
+    theme(plot.title=element_text(size = 20, hjust=0.5, margin = margin(t=10, b=-30)),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=20, color="black"),
+          legend.title=element_blank(), # This removes the legend title
+          legend.position=c(.1, .85),
+          legend.text=element_text(size=15),
+          legend.key = element_rect(fill="grey"))
+  
+  
+  cat('####',paste0("Subject", id), "{-}",'\n')
+  print(T2_0_plot)
+  cat('\n \n')
+  
+}
+```
+
+
+
+### Plots of $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
 
 Initialize.
 
@@ -504,7 +594,7 @@ for (id in seq(length(subgroupList))) {
           axis.title.y.right=element_text(color="blue"),
           axis.text.y.right=element_text(color="blue"))
 
-  cat('###',paste0("Subject", id), "{-}",'\n')
+  cat('####',paste0("Subject", id), "{-}",'\n')
   print(T2Plot)
   cat('\n \n')
 }
