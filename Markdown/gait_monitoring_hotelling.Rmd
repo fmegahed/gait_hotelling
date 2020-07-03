@@ -231,22 +231,24 @@ names(subgroupList) <- c(paste0("subject", c(1:12, 14:15)))
 ```
 
 
-# $T^2$ Charting
+# $T^2$ Charts
 
-Using $T^2$ statistic, we compare the mean of subgroups against a reference multivariate distribution by accounting for the correlation between different variables. We calculated the $T^2$ for subgroups using the method introduced in @mason2001applying. Also, to construct a $T^2$ chart, one needs to find the control limits. The control limits are conventionally calculated using the distribution parameters. However, as we investigated the gait data in our analysis, it did not follow any parametric distribution. Therefore, we implemented a non-parametric approach to bootstrap the control limits in both retrospective and prospective phases using the method in @phaladiganon2011bootstrap.
-
-
-## $T^2$ for Gait Acceleration Profiles
+Using $T^2$ statistic, we compared the mean of subgroups against a reference multivariate distribution by accounting for the correlation between different variables. We calculated the $T^2$ for subgroups using the method introduced in @mason2001applying. Also, to construct a $T^2$ chart, one needs to find the control limits. The control limits are conventionally calculated using the distribution parameters. However, as we investigated the gait data in our analysis, it did not follow any parametric distribution. Therefore, we implemented a non-parametric approach to bootstrap the control limits in both retrospective and prospective phases using the method in @phaladiganon2011bootstrap.
 
 Our $T^2$ charting approach is comprised of 3 phases as described below:
 
 1. **phase 0:** The purpose of phase 0 is to construct a clean *in-control* data set that captures the distribution of the reference data. In this phase we removed the outliers in one pass and updated the subgroups. Then we calculated the within-batch covariance and subgroup means to be used in the following phases.
 
-2. **phase 1:** Although this phase is part of the prospective phase, the control limit for the monitoring phase is calculated using the data in this phase. This is due to the fact that the distribution of the data in retrospective phase differs from that of prospective phase and therefore cannot be directly used for bootstrapping the control limits. To tht end, a set of data from the prospective phase were isolated to be used for bootstrapping the control limit. Note that this set of data were not used for the calculation of the covariance in phase 0.
+2. **phase 1:** Although this phase is part of the prospective phase, the control limit for the prospective phase is calculated using the data in this phase. This is due to the fact that the distribution of the data in retrospective phase differs from that of prospective phase and therefore cannot be directly used for bootstrapping the control limits. To that end, phase 1 data were isolated from the prospective phase to bootstrap the control limit. Note that this set of data were not involved for calculation of the covariance in phase 0.
 
-3. **phase 2:** The $T^2$ was calculated for each prospective subgroup using the mean and covariance parameters, calculated from the phase 0 data. The $T^2$ chart was constructed and the $T^2$ for each subgroup was compared against the control limit. The chart generates an *out-of-control* signal when the $T^2$ is larger than the control limit.
+3. **phase 2:** The $T^2$ was calculated for each prospective subgroup using the mean and covariance from phase 0. The $T^2$ chart was constructed and the $T^2$ for each subgroup was compared against the control limit. The chart's purpose is to generates an *out-of-control* signal when the $T^2$ is larger than the control limit. The signal means that the change is associated with an assignable cause that could not be justified by random variation in the reference data distribution.
 
-The three phases are implemented in the following code chunk. We present the control charts for the retrospective phase (phase0) and the prospective phase (phase 1 & 2) in the following sections.
+We constructed the $T^2$ charts for 2 sets of gait data to monitor the gait changes in 2 different schemes. In the first scheme we used the acceleration profiles and in the second scheme we used the gait features. In the following sections we provide more details for each scheme.
+
+## $1^{st}$ Scheme: $T^2$ Chart for Gait Acceleration Profiles
+
+The linear acceleration signals as well as angular velocity signals were collected from the IMU and preprocessed in a matlab code to calculate the acceleration in the global frame of reference. We removed the gravity from the vertical component, calculated the acceleration magnitude, and smoothed it using a $4^{th}$ order Butterworth low-pass filter. Start and end points in each gait cycle were detected using the topological features of the acceleration magnitude and vertical acceleration signals and were used to segment the acceleration magnitude signal. Each segment, henceforth acceleration profile, contained different number of data points. We could downsample the data to include equal number of data points in each profile, however, this would have registered the curves and removed crucial information in terms of gait duration. Therefore, we removed significantly shorter profiles (profiles shorter than the $2^{nd}$ percentile of all profile length in each cylce) and trimmed the remaining profiles at their shortest length. Next, we implemented our $T^2$ charting approach on the gait profiles in the following cone snippet.
+
 
 ```{r T2Profiles}
 T2Profiles <- list()
@@ -306,7 +308,7 @@ names(T2Profiles) <- paste0("subject", c(1:12, 14:15))
 
 ### Plots of Phase 0 $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
 
-Initialize.
+Below, we visualized the phase 0 $T^2$ charts for individual gaits. The control limit is bootstrapped and used to define the outlying gaits. The gaits with a $T^2$ larger than the control limit (shown in red) are removed from their corresponding subgroups. Next, we calculated the within-batch covariance using the updated subgroups.
 
 
 ```{r T2Profilesphase0, fig.align='center', results='asis', out.width="100%"}
@@ -340,7 +342,8 @@ for (id in seq(length(subgroupList))) {
           legend.title=element_blank(), # This removes the legend title
           legend.position=c(.1, .85),
           legend.text=element_text(size=15),
-          legend.key = element_rect(fill="grey"))
+          legend.key = element_rect(fill="grey"),
+          legend.box.background = element_rect(colour = "black"))
 
   cat('####',paste0("Subject", id), "{-}",'\n')
   print(T2_0_plot)
@@ -353,7 +356,7 @@ for (id in seq(length(subgroupList))) {
 
 ### Plots of $T^2$ on Gait Acceleration Profiles along with Reported RPE {.tabset .tabset-fade}
 
-Initialize.
+The final $T^2$ charts for the prospective phase are plotted below. The inverted triangles represent the phase 1 data and the dots represent phase 2 data. We also included the RPE values that were reported by the subjects every 10 minutes during the experiment on a different scale on the right axis. Although the purpose of the study is to detect the change in gait patterns, the RPE plots provide some insight for the utility of the work for its potential application in fatigue detection.
 
 ```{r T2ProfilesRPEPlot, fig.align='center', results='asis', out.width="100%"}
 
@@ -410,6 +413,7 @@ for (id in seq(length(subgroupList))) {
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"),
+          legend.box.background = element_rect(colour = "black"),
           axis.title.y.right=element_text(color="blue"),
           axis.text.y.right=element_text(color="blue"))
 
@@ -420,9 +424,9 @@ for (id in seq(length(subgroupList))) {
 ```
 
 
-## $T^2$ for Gait Features
+## $2^{nd}$ Scheme: $T^2$ Chart for Gait Features
 
-Initialize.
+As explained in section 4.1, the acceleration profiles were segmented for each gait cycle. In the second scheme the gait features (stride length, height, and duration) were calculated for each segmented gait cycle. In the following code chunk we implemented our $T^2$ charting method on the gait features.
 
 
 ```{r T2Features}
@@ -488,7 +492,7 @@ names(SWList) <- paste0("subject", c(1:12, 14:15))
 
 ### Plots of Phase 0 $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
 
-Initialize.
+Below we present the $T^2$ charts for phase 0 where the outliers are detected and removed from the data.
 
 ```{r T2Featuresphase0, fig.align='center', results='asis', out.width="100%"}
 for (id in seq(length(subgroupList))) {
@@ -520,7 +524,8 @@ for (id in seq(length(subgroupList))) {
           legend.title=element_blank(), # This removes the legend title
           legend.position=c(.1, .85),
           legend.text=element_text(size=15),
-          legend.key = element_rect(fill="grey"))
+          legend.key = element_rect(fill="grey"),
+          legend.box.background = element_rect(colour = "black"))
   
   
   cat('####',paste0("Subject", id), "{-}",'\n')
@@ -534,7 +539,8 @@ for (id in seq(length(subgroupList))) {
 
 ### Plots of $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
 
-Initialize.
+Belowe we present the prospective phase $T^2$ charts for the $2^{nd}$ scheme. The charts show consistent results with the $T^2$ charts in the $1^{st}$ scheme.
+
 
 ```{r T2FeaturesRPEPlot, fig.align='center', results='asis', out.width="100%"}
 
@@ -591,6 +597,7 @@ for (id in seq(length(subgroupList))) {
           legend.position=c(.1, .68),
           legend.text=element_text(size=10),
           legend.key = element_rect(fill="grey"),
+          legend.box.background = element_rect(colour = "black"),
           axis.title.y.right=element_text(color="blue"),
           axis.text.y.right=element_text(color="blue"))
 
