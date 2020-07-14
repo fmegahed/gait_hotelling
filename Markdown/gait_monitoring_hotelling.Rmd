@@ -539,7 +539,7 @@ for (id in seq(length(subgroupList))) {
 
 ### Plots of $T^2$ on Gait Features along with Reported RPE {.tabset .tabset-fade}
 
-Belowe we present the prospective phase $T^2$ charts for the $2^{nd}$ scheme. The charts show consistent results with the $T^2$ charts in the $1^{st}$ scheme.
+Below we present the prospective phase $T^2$ charts for the $2^{nd}$ scheme. The charts show consistent results with the $T^2$ charts in the $1^{st}$ scheme.
 
 
 ```{r T2FeaturesRPEPlot, fig.align='center', results='asis', out.width="100%"}
@@ -674,7 +674,6 @@ For feature monitoring scheme we decomposed the $T^2$ statistic for each individ
 
 qList <- list()
 for (id in seq(length(subgroupList))) {
-# for (id in 1:2) {
   ############### Read inputs
   X0 <- X0Updated[[id]]$X0
   X1 <- subgroupList[[id]]$LHD$X1 %>% lapply(function(x) {x=x[,1:3]})
