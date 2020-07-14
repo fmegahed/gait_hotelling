@@ -1,33 +1,4 @@
-"Time
-(seconds)
-WU removed","Sub1 (Jim)
-Borg rating
-(RPE)","Sub2 (Anastasia) Borg rating
-(RPE)","Sub3 (Tarun) Borg rating
-(RPE)","Sub4 (Angela) Borg rating
-(RPE)","Sub5 (Darya)
-Borg rating
-(RPE)","Sub6 (Gary)
-Borg rating
-(RPE)","Sub7 (Holly)
-Borg rating
-(RPE)","Sub8 (Larry R)
-Borg rating
-(RPE)","Sub9 (Lisa)
-Borg rating
-(RPE)","Sub10 (Nicholas)
-Borg rating
-(RPE)","Sub11 (Po)
-Borg rating
-(RPE)","Sub12 (Alycia)
-Borg rating
-(RPE)","Sub13 (Dave)
-Borg rating
-(RPE)","Sub14 (Dorisha)
-Borg rating
-(RPE)","Sub15 (Sean)
-Borg rating
-(RPE)"
+Time (s),Sub1 RPE,Sub2 RPE,Sub3 RPE,Sub4 RPE,Sub5 RPE,Sub6 RPE,Sub7 RPE,Sub8 RPE,Sub9 RPE,Sub10 RPE,Sub11 RPE,Sub12 RPE,Sub13 RPE,Sub14 RPE,Sub15 RPE
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 600,0.2,0,0.25,0.333333333,0.333333333,0,0.125,0,0.333333333,0,0,0,0,0.125,0.166666667
 1200,0.4,0.125,0.25,0.333333333,0.416666667,0,0.25,0,0.333333333,0.2,0,0,0.166666667,0.25,0.333333333
